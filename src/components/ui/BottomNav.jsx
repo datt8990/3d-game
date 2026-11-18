@@ -7,8 +7,8 @@ const NAV_ITEMS = [
   { id: 'online', icon: '👥', label: 'Online', shortLabel: 'Online', action: 'online' },
   { id: 'leaderboard', icon: '🏆', label: 'Bảng xếp hạng', shortLabel: 'BXH', action: 'leaderboard' },
   { id: 'events', icon: '🎁', label: 'Sự kiện', shortLabel: 'Sự kiện', action: 'events' },
-  { id: 'item_shop', icon: '🛍️', label: 'Cửa hàng vật phẩm', shortLabel: 'Vật phẩm', action: 'items' },
-  { id: 'character', icon: '👤', label: 'Nhân vật', shortLabel: 'Nhân vật', action: 'character' },
+  { id: 'item_shop', icon: '🛍️', label: 'Cửa hàng vật phẩm', shortLabel: ' Tiệm đồ', action: 'items' },
+  { id: 'character', icon: '👤', label: 'Nhân vật', shortLabel: 'Hồ sơ', action: 'character' },
 ];
 
 export default function BottomNav() {
@@ -31,7 +31,7 @@ export default function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-2 left-2 right-2 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-20 pointer-events-auto sm:max-w-[96vw]">
+    <nav className="fixed bottom-2 left-2 right-2 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-40 pointer-events-auto sm:max-w-[96vw]">
       <div className="boba-glass rounded-2xl sm:rounded-3xl p-1.5 sm:px-3 sm:py-2 grid grid-cols-7 sm:flex items-center gap-1 sm:gap-2">
         {NAV_ITEMS.map((item) => {
           const isActive =

@@ -254,7 +254,7 @@ export default function CraftingOverlay() {
       )}
 
       {/* KAWAII PASTEL WORKSTATION DOCK */}
-      <div className="w-full max-w-4xl mx-auto boba-glass rounded-3xl p-2 sm:p-2.5 pointer-events-auto">
+      <div className="w-full max-w-5xl mx-auto boba-glass rounded-3xl p-2 sm:p-2.5 pointer-events-auto">
         {/* Mobile Step Switcher Pills (< 768px) */}
         <div className="grid grid-cols-4 gap-1 mb-2 md:hidden">
           {[

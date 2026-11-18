@@ -5,6 +5,7 @@ import GameCanvas from './components/three/GameCanvas';
 import TopHUD from './components/ui/TopHUD';
 import BottomNav from './components/ui/BottomNav';
 import CraftingOverlay from './components/ui/CraftingOverlay';
+import SceneOverlaysHUD from './components/ui/SceneOverlaysHUD';
 import AngrySplatEffect from './components/ui/AngrySplatEffect';
 import ShopUpgradeModal from './components/ui/ShopUpgradeModal';
 import OnlineModal, { CityFloatingChat } from './components/ui/OnlineModal';
@@ -97,6 +98,7 @@ export default function App() {
 
         <TopHUD />
         <CraftingOverlay />
+        <SceneOverlaysHUD />
         <CityFloatingChat />
         <BottomNav />
 

@@ -160,7 +160,7 @@ export function resolveChibiPreset(pathOrKey) {
 
 // Shared smooth geometries for 60fps mobile & desktop rendering
 const HEAD_GEO = new THREE.SphereGeometry(0.31, 28, 24);
-const HAIR_CAP_GEO = new THREE.SphereGeometry(0.328, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.58);
+const HAIR_CAP_GEO = new THREE.SphereGeometry(0.326, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.43);
 const BUN_GEO = new THREE.SphereGeometry(0.135, 18, 18);
 const HAND_GEO = new THREE.SphereGeometry(0.068, 14, 14);
 const SHOE_GEO = new THREE.CapsuleGeometry(0.068, 0.06, 10, 14);
@@ -471,15 +471,15 @@ export default function KawaiiChibi3D({
           <mesh geometry={HAIR_CAP_GEO} scale={[1.09, 1.0, 1.04]} rotation={[-0.14, 0, 0]} castShadow>
             <meshStandardMaterial color={cfg.hair} roughness={0.48} />
           </mesh>
-          {/* Cute Front Bangs (3 Fluffy Fringes Across Forehead) */}
+          {/* Cute Front Bangs (Lifted slightly so full big starry eyes shine!) */}
           {[-0.11, 0, 0.11].map((bx, i) => (
             <mesh
               key={i}
-              position={[bx, 0.13, 0.275 - Math.abs(bx) * 0.18]}
-              rotation={[0.25, 0, bx * -0.6]}
-              scale={[0.85, 1.25, 0.55]}
+              position={[bx, 0.175, 0.268 - Math.abs(bx) * 0.16]}
+              rotation={[0.22, 0, bx * -0.55]}
+              scale={[0.82, 0.92, 0.5]}
             >
-              <sphereGeometry args={[0.085, 14, 14]} />
+              <sphereGeometry args={[0.082, 14, 14]} />
               <meshStandardMaterial color={cfg.hair} roughness={0.48} />
             </mesh>
           ))}

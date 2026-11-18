@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useRef, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Html, RoundedBox } from '@react-three/drei';
+import { RoundedBox } from '@react-three/drei';
 import gsap from 'gsap';
 import { useGameStore } from '../../store/useGameStore';
 import { CHARACTER_OUTFITS, TEA_BASES, TOPPINGS } from '../../data/gameData';
@@ -220,40 +220,12 @@ function CustomerQueueItem({ customer, index, isFront, isCraftingMode, onSelect 
         onClick={() => onSelect(customer.uid)}
       />
 
-      {(isFront || (!isCraftingMode && index === 1)) && (
-        <Html position={[0, 1.72, 0]} center>
-          <div
-            onClick={() => onSelect(customer.uid)}
-            className={`cursor-pointer pointer-events-auto rounded-2xl px-2.5 py-1.5 shadow-lg transition-transform hover:scale-105 min-w-[148px] sm:min-w-[162px] ${
-              isFront
-                ? 'bg-white/95 border-2 border-pink-400 text-[#4a1d35]'
-                : 'bg-white/90 border border-pink-300 text-[#591d3b]'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs font-extrabold">
-              <span className="text-pink-600">
-                {customer.icon} {customer.type}
-              </span>
-              <span
-                className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                  patiencePct > 40 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-500 text-white animate-pulse'
-                }`}
-              >
-                ⏳ {customer.patience}s
-              </span>
-            </div>
-            {!isCraftingMode && (
-              <div className="flex items-center justify-between gap-1.5 mt-1">
-                <span className="text-[10px] sm:text-[11px] text-[#6d3b53] font-bold truncate">
-                  {teaObj?.icon} {teaObj?.shortName} • {customer.order.milk}%
-                </span>
-                <span className="bg-gradient-to-r from-pink-400 to-rose-500 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-lg shrink-0">
-                  Pha ngay
-                </span>
-              </div>
-            )}
-          </div>
-        </Html>
+      {/* Cute Pink Selection Ring Under Front Customer (Zero HTML Portal Unmount Crash!) */}
+      {isFront && (
+        <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.34, 0.42, 28]} />
+          <meshBasicMaterial color="#ff8fab" />
+        </mesh>
       )}
     </group>
   );
@@ -458,13 +430,17 @@ function PremiumStylizedBaristaCounter({ sealerLv, autoLv }) {
         </group>
       </Suspense>
 
-      {/* 4. CENTER SERVING MAT & PROPORTIONED 36CM SHOWCASE BOBA CUP */}
-      <mesh position={[0, 1.005, 0.14]}>
-        <cylinderGeometry args={[0.2, 0.21, 0.012, 28]} />
-        <meshStandardMaterial color="#f472b6" roughness={0.5} />
+      {/* 4. ELEVATED PINK BARISTA PEDESTAL & HERO 3D BOBA CUP (100% Visible Above UI Dock!) */}
+      <mesh position={[0, 1.04, 0.14]} castShadow>
+        <cylinderGeometry args={[0.2, 0.23, 0.08, 28]} />
+        <meshStandardMaterial color="#ff8fab" roughness={0.4} />
       </mesh>
-      <group ref={cupHolderRef} position={[0, 1.19, 0.14]}>
-        <BobaCup3D cup={currentCup} scale={0.24} isPouring={isPouringAnim} />
+      <mesh position={[0, 1.085, 0.14]}>
+        <cylinderGeometry args={[0.18, 0.18, 0.015, 28]} />
+        <meshStandardMaterial color="#fff0f6" roughness={0.35} />
+      </mesh>
+      <group ref={cupHolderRef} position={[0, 1.29, 0.14]}>
+        <BobaCup3D cup={currentCup} scale={0.26} isPouring={isPouringAnim} />
       </group>
 
       {/* 5. SLEEK COMPACT STAINLESS CUP SEALER MACHINE (34cm wide × 48cm high!) */}
@@ -779,17 +755,13 @@ export default function BobaShopScene() {
           <boxGeometry args={[floorWidth * 0.34, 3.2, 0.08]} />
           <meshStandardMaterial color="#bae6fd" transparent opacity={0.25} roughness={0.1} depthWrite={false} />
         </mesh>
-        <mesh position={[-floorWidth / 2 + 0.35, 1.9, 0]} castShadow>
-          <boxGeometry args={[0.42, 3.8, 0.42]} />
-          <meshStandardMaterial color="#8c583a" roughness={0.7} />
+        <mesh position={[-floorWidth / 2 + 0.35, 1.6, 0]} castShadow>
+          <boxGeometry args={[0.36, 3.2, 0.36]} />
+          <meshStandardMaterial color="#b57c52" roughness={0.65} />
         </mesh>
-        <mesh position={[floorWidth / 2 - 0.35, 1.9, 0]} castShadow>
-          <boxGeometry args={[0.42, 3.8, 0.42]} />
-          <meshStandardMaterial color="#8c583a" roughness={0.7} />
-        </mesh>
-        <mesh position={[0, 3.65, 0]} castShadow>
-          <boxGeometry args={[floorWidth, 0.36, 0.48]} />
-          <meshStandardMaterial color="#8c583a" roughness={0.7} />
+        <mesh position={[floorWidth / 2 - 0.35, 1.6, 0]} castShadow>
+          <boxGeometry args={[0.36, 3.2, 0.36]} />
+          <meshStandardMaterial color="#b57c52" roughness={0.65} />
         </mesh>
       </group>
 
