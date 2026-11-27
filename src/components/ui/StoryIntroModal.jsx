@@ -35,7 +35,7 @@ export default function StoryIntroModal() {
             <b className="text-amber-600">500 Xu</b>.
           </p>
           <p>
-            💖 Tự tay pha chế 6 bước, nhập kho nguyên liệu, mở Khu VIP, nuôi cún Shiba & thi đấu Online để trở thành <b>Nữ Hoàng Trà Sữa Boba Land</b>!
+            💖 Pha chế siêu gọn <b>3 bước</b>, đổi <b>4 Style Quán 3D</b>, vuốt ve bé Mèo/Cún, quay Vòng Quay May Mắn, chụp ảnh Check-in & thi đấu Online để trở thành <b>Nữ Hoàng Trà Sữa Boba Land</b>!
           </p>
         </div>
 

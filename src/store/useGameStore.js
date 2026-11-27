@@ -8,12 +8,16 @@ import {
   SUGAR_OPTIONS,
   ICE_OPTIONS,
   TOPPINGS,
+  SIGNATURE_RECIPES,
+  DAILY_QUESTS,
+  LUCKY_WHEEL_PRIZES,
   CUSTOMER_ARCHETYPES,
   SHOP_UPGRADES,
   FRANCHISE_CITIES,
   ONLINE_BOT_PLAYERS,
   getTierForLevel,
 } from '../data/gameData';
+import { SHOP_THEMES } from '../components/three/cafeTextures';
 import { sound } from '../audio/soundEngine';
 
 function pickRandom(arr) {
@@ -25,33 +29,37 @@ export function generateOrderForArchetype(archetype, playerLevel = 1) {
   const unlockedToppings = TOPPINGS.filter((t) => t.unlockLevel <= playerLevel);
 
   const tea = pickRandom(unlockedTeas).id;
-  let milk = pickRandom(MILK_OPTIONS).id;
-  let sugar = pickRandom(SUGAR_OPTIONS).id;
-  let ice = pickRandom(ICE_OPTIONS).id;
+  let milk = 100;
+  let sugar = 50;
+  let ice = 50;
   let toppings = [];
 
   if (archetype.id === 'student') {
-    sugar = pickRandom([70, 100]);
+    sugar = pickRandom([50, 100]);
     milk = 100;
-    const count = Math.min(unlockedToppings.length, Math.random() > 0.4 ? 2 : 3);
+    const count = Math.min(unlockedToppings.length, Math.random() > 0.45 ? 2 : 1);
     const shuffled = [...unlockedToppings].sort(() => Math.random() - 0.5);
     toppings = shuffled.slice(0, count).map((t) => t.id);
   } else if (archetype.id === 'office') {
-    sugar = pickRandom([0, 30]);
+    sugar = 0;
+    milk = pickRandom([50, 100]);
     ice = pickRandom([50, 100]);
     toppings = [pickRandom(unlockedToppings).id];
   } else if (archetype.id === 'troll') {
     milk = 0;
     ice = pickRandom([0, 100]);
     sugar = ice === 0 ? 100 : 0;
-    toppings = unlockedToppings.slice(0, 3).map((t) => t.id);
+    toppings = unlockedToppings.slice(0, Math.min(2, unlockedToppings.length)).map((t) => t.id);
   } else if (archetype.id === 'idol') {
-    sugar = pickRandom([0, 30, 50]);
+    sugar = 0;
     milk = 50;
+    ice = 50;
     toppings = [pickRandom(unlockedToppings).id];
   } else {
     milk = pickRandom([50, 100]);
-    const count = Math.random() > 0.45 ? 2 : 1;
+    sugar = pickRandom([50, 100]);
+    ice = pickRandom([50, 100]);
+    const count = Math.random() > 0.55 ? 2 : 1;
     const shuffled = [...unlockedToppings].sort(() => Math.random() - 0.5);
     toppings = shuffled.slice(0, count).map((t) => t.id);
   }
@@ -84,59 +92,85 @@ export function createCustomerInstance(level = 1, vipUnlocked = false) {
   };
 }
 
-const defaultInventory = () => ({
-  black_tea: 8,
-  green_tea: 7,
-  oolong_tea: 7,
-  taro_tea: 5,
-  milk: 12,
-  sugar: 14,
+export const defaultInventory = () => ({
+  black_tea: 10,
+  strawberry_tea: 10,
+  green_tea: 8,
+  oolong_tea: 8,
+  taro_tea: 6,
+  milk: 14,
+  sugar: 15,
   ice: 15,
-  pearl: 8,
-  pudding: 7,
-  jelly: 7,
-  golden_boba: 5,
-  cheese_foam: 5,
+  pearl: 10,
+  pudding: 8,
+  jelly: 8,
+  golden_boba: 6,
+  cheese_foam: 6,
 });
 
-const defaultCup = () => ({
-  step: 1,
-  tea: null,
-  milk: null,
-  sugar: null,
-  ice: null,
-  toppings: [],
-  shakeProgress: 0,
-  isPoured: false,
-  isSealed: false,
-  pearl200: false,
-  pudding5: false,
-  loveSpice: false,
+// Smart pre-defaulted cup so girls only need 3 easy taps (Tea -> Topping -> 1-Tap Shake & Serve!)
+function defaultCup(inv = null) {
+  const milkStock = inv ? (inv.milk ?? 0) : 14;
+  const sugarStock = inv ? (inv.sugar ?? 0) : 15;
+  const iceStock = inv ? (inv.ice ?? 0) : 15;
+  return {
+    step: 1,
+    tea: null,
+    milk: milkStock >= 2 ? 100 : milkStock >= 1 ? 50 : 0,
+    sugar: sugarStock >= 1 ? 50 : 0,
+    ice: iceStock >= 1 ? 50 : 0,
+    toppings: [],
+    shakeProgress: 0,
+    isPoured: false,
+    isSealed: false,
+    isServingAnim: false,
+    pearl200: false,
+    pudding5: false,
+    loveSpice: false,
+  };
+}
+
+const defaultDailyQuests = () => ({
+  serve_3: { progress: 0, claimed: false },
+  pet_animal: { progress: 0, claimed: false },
+  checkin_photo: { progress: 0, claimed: false },
+  change_style: { progress: 0, claimed: false },
 });
 
 export const useGameStore = create(
   persist(
     (set, get) => ({
       hasSeenIntro: false,
-      playerName: 'Chủ Quán Boba',
-      shopName: 'Boba Mộng Mơ',
-      coins: 500,
+      playerName: 'Cô Chủ Boba',
+      shopName: 'Tiệm Trà Sakura',
+      coins: 550,
       gems: 25,
       xp: 0,
       level: 1,
-      shopStars: 4.5,
+      shopStars: 4.7,
       totalCupsServed: 0,
 
       // Finite Ingredient Stock System ("Kho nguyên liệu giới hạn")!
       inventory: defaultInventory(),
 
+      // 4 Switchable 3D Shop Themes!
+      shopTheme: 'sakura',
+      unlockedThemes: ['sakura', 'matcha'],
+
+      // Cozy Features: Recipe Book, Daily Quests, Lucky Wheel, Petting, Photo Check-in
+      recipeMastery: {},
+      dailyQuests: defaultDailyQuests(),
+      luckyWheelFreeSpins: 1,
+      lastPetTime: 0,
+      photoCount: 0,
+
       sceneMode: 'shop',
       cameraTarget: 'overview',
-      activeModal: null, // null | 'shop_upgrade' | 'inventory' | 'online' | 'leaderboard' | 'events' | 'items' | 'character'
+      activeModal: null, // null | 'shop_upgrade' | 'inventory' | 'online' | 'leaderboard' | 'events' | 'items' | 'character' | 'cozy' | 'photo'
 
       upgrades: {
         sealer_pro: 0,
-        furniture_set: 1,
+        furniture_set: 2,
         expand_shop: 0,
         auto_brewer: 0,
         hire_staff: 0,
@@ -146,14 +180,14 @@ export const useGameStore = create(
       franchises: {},
 
       character: {
-        modelId: 'female_a',
+        modelId: 'vivi',
         hatId: 'none',
-        petId: 'none',
-        unlockedModels: ['female_a', 'male_a'],
+        petId: 'cafe_cat',
+        unlockedModels: ['vivi', 'girl_a'],
         unlockedHats: ['none'],
-        unlockedPets: ['none'],
+        unlockedPets: ['none', 'cafe_cat'],
         customTitle: null,
-        badges: ['🌱 Khởi Nghiệp Boba Land'],
+        badges: ['🌸 Chủ Quán Khởi Nghiệp'],
       },
 
       customers: [],
@@ -178,7 +212,7 @@ export const useGameStore = create(
           active: false,
           timeLeft: 120,
           duration: 120,
-          playerStartCoins: 500,
+          playerStartCoins: 550,
           playerEarned: 0,
           rivals: [
             { id: 'r1', name: 'HoàngTửTrânChâu 👑', earned: 0, rate: 18 },
@@ -197,9 +231,9 @@ export const useGameStore = create(
           result: null,
         },
         worldChat: [
-          { id: 'c1', sender: 'BảoNgọc_Boba 🌸', text: 'Nhớ canh kho nguyên liệu nha mọi người, đang pha mà hết trân châu là khách bỏ về đó!', time: 'Vừa xong' },
+          { id: 'c1', sender: 'BảoNgọc_Boba 🌸', text: 'Style Quán Sakura Hồng Phấn với tiếng rót trà thật nghe chill xỉu luôn mọi người ơi!', time: 'Vừa xong' },
           { id: 'c2', sender: 'HoàngTửTrânChâu 👑', text: 'Ai solo Đại Chiến Pha Chế 1v1 không? Đang chuỗi thắng 5 trận nè 😎', time: 'Vừa xong' },
-          { id: 'c3', sender: 'MèoÚ_NghiệnTrà 🐱', text: 'Sắp có Boss Trân Châu xuất hiện ở quảng trường kìa anh em ơi!!', time: 'Vừa xong' },
+          { id: 'c3', sender: 'MèoÚ_NghiệnTrà 🐱', text: 'Mọi người nhớ vuốt ve bé Mèo trong quán để nhận Xu & quay Vòng Quay May Mắn nha!', time: 'Vừa xong' },
         ],
         friends: ['BảoNgọc_Boba 🌸'],
         partyTimeLeft: 0,
@@ -217,16 +251,147 @@ export const useGameStore = create(
         return 15 + expandLv * 10;
       },
 
-      dismissIntro: (playerName, shopName) =>
+      incrementQuest: (questId, delta = 1) => {
+        set((s) => {
+          const cur = s.dailyQuests?.[questId] || { progress: 0, claimed: false };
+          return {
+            dailyQuests: {
+              ...(s.dailyQuests || defaultDailyQuests()),
+              [questId]: { ...cur, progress: cur.progress + delta },
+            },
+          };
+        });
+      },
+
+      claimDailyQuest: (questId) => {
+        const s = get();
+        const qCfg = DAILY_QUESTS.find((q) => q.id === questId);
+        const qState = s.dailyQuests?.[questId];
+        if (!qCfg || !qState || qState.claimed || qState.progress < qCfg.target) return;
+        sound.playSuccessFanfare();
+        confetti({ particleCount: 65, spread: 60, origin: { y: 0.65 } });
+        s.addCoinsAndXp(qCfg.rewardCoins, qCfg.rewardXp);
+        s.addPopup(`🎁 Hoàn thành nhiệm vụ: +${qCfg.rewardCoins} Xu!`, '#4ade80');
+        set((st) => ({
+          dailyQuests: {
+            ...st.dailyQuests,
+            [questId]: { ...qState, claimed: true },
+          },
+        }));
+      },
+
+      selectOrBuyTheme: (themeId) => {
+        const s = get();
+        const theme = SHOP_THEMES[themeId];
+        if (!theme) return;
+        const unlocked = s.unlockedThemes || ['sakura', 'matcha'];
+        if (unlocked.includes(themeId)) {
+          sound.playClick();
+          set({ shopTheme: themeId });
+          s.incrementQuest('change_style', 1);
+          s.addPopup(`🎨 Đã đổi sang Style: ${theme.icon} ${theme.name}!`, '#f472b6');
+          return;
+        }
+        if (s.coins < theme.cost) {
+          s.addPopup(`Cần ${theme.cost} Xu để mở khóa Style ${theme.name}!`, '#f43f5e');
+          return;
+        }
+        sound.playSuccessFanfare();
+        confetti({ particleCount: 70, spread: 65 });
+        set({
+          coins: s.coins - theme.cost,
+          shopTheme: themeId,
+          unlockedThemes: [...unlocked, themeId],
+        });
+        s.incrementQuest('change_style', 1);
+        s.addPopup(`✨ Mở khóa Style ${theme.icon} ${theme.name}!`, '#f472b6');
+      },
+
+      spinLuckyWheel: () => {
+        const s = get();
+        const isFree = (s.luckyWheelFreeSpins ?? 0) > 0;
+        const spinCost = 80;
+        if (!isFree && s.coins < spinCost) {
+          s.addPopup(`Cần ${spinCost} Xu để quay tiếp!`, '#f43f5e');
+          return null;
+        }
+        const prizeIdx = Math.floor(Math.random() * LUCKY_WHEEL_PRIZES.length);
+        const prize = LUCKY_WHEEL_PRIZES[prizeIdx];
+        sound.playClick();
+        set((st) => ({
+          coins: isFree ? st.coins : st.coins - spinCost,
+          luckyWheelFreeSpins: isFree ? Math.max(0, (st.luckyWheelFreeSpins ?? 1) - 1) : 0,
+        }));
+        return { prizeIdx, prize };
+      },
+
+      applyLuckyWheelPrize: (prize) => {
+        if (!prize) return;
+        const s = get();
+        sound.playSuccessFanfare();
+        confetti({ particleCount: 75, spread: 70 });
+        if (prize.type === 'coins') {
+          s.addCoinsAndXp(prize.value, 20);
+          s.addPopup(`🎰 Trúng thưởng ${prize.icon} +${prize.value} Xu!`, '#facc15');
+        } else if (prize.type === 'xp') {
+          s.addCoinsAndXp(0, prize.value);
+          s.addPopup(`🎰 Trúng thưởng ⭐ +${prize.value} XP!`, '#38bdf8');
+        } else if (prize.type === 'idol') {
+          set({ idolBuffTimer: Math.max(s.idolBuffTimer, prize.value) });
+          s.addPopup(`🎰 Trúng Buff 🌸 Idol x2 Khách (${prize.value}s)!`, '#f472b6');
+        } else if (prize.type === 'stock') {
+          const maxCap = s.getMaxStockCapacity();
+          const fullInv = { ...s.inventory };
+          Object.keys(defaultInventory()).forEach((k) => {
+            fullInv[k] = maxCap;
+          });
+          set({ inventory: fullInv });
+          s.addPopup(`🎰 Trúng thưởng 📦 Lấp Đầy Toàn Bộ Kho!`, '#4ade80');
+        }
+      },
+
+      petCafeAnimal: (petName = 'Bé Mèo Mướp') => {
+        const s = get();
+        const now = Date.now();
+        if (now - (s.lastPetTime || 0) < 2200) {
+          sound.playKittyMeow();
+          return;
+        }
+        sound.playKittyMeow();
+        set({ lastPetTime: now });
+        s.addCoinsAndXp(20, 12);
+        s.incrementQuest('pet_animal', 1);
+        s.addPopup(`💖 ${petName} thích lắm! Meow~ (+20 Xu)`, '#f472b6');
+      },
+
+      claimPhotoBonus: () => {
+        const s = get();
+        sound.playShutter();
+        setTimeout(() => sound.playCoin(), 180);
+        s.addCoinsAndXp(120, 30);
+        s.incrementQuest('checkin_photo', 1);
+        set((st) => ({ photoCount: (st.photoCount || 0) + 1 }));
+        s.addPopup('📸 Đăng ảnh Check-in BobaGram thành công! (+120 Xu)', '#f472b6');
+      },
+
+      dismissIntro: (playerName, shopName) => {
+        sound.preload();
+        sound.playDoorBell();
         set((s) => ({
           hasSeenIntro: true,
           playerName: playerName?.trim() || s.playerName,
           shopName: shopName?.trim() || s.shopName,
-        })),
+        }));
+      },
 
       setSceneMode: (mode) => {
         sound.playClick();
-        set({ sceneMode: mode, activeModal: null });
+        const s = get();
+        set({
+          sceneMode: mode,
+          activeModal: null,
+          currentCup: mode === 'crafting' ? defaultCup(s.inventory) : s.currentCup,
+        });
       },
 
       setCameraTarget: (target) => {
@@ -248,7 +413,7 @@ export const useGameStore = create(
           set((s) => ({
             floatingPopups: s.floatingPopups.filter((p) => p.id !== id),
           }));
-        }, 2200);
+        }, 2300);
       },
 
       addCoinsAndXp: (coinDelta, xpDelta = 0) => {
@@ -298,7 +463,7 @@ export const useGameStore = create(
         return Math.round(total);
       },
 
-      // --- INGREDIENT RESTOCKING ACTIONS ("Nhập nguyên liệu giới hạn") ---
+      // --- INGREDIENT RESTOCKING ACTIONS ---
       buyIngredientStock: (id, packAmount, cost) => {
         const s = get();
         const maxCap = s.getMaxStockCapacity();
@@ -370,6 +535,8 @@ export const useGameStore = create(
           s.addCoinsAndXp(passive, Math.max(1, Math.floor(passive / 30)));
         }
 
+        let spawnedNewCustomer = false;
+
         set((state) => {
           const idolBuffTimer = Math.max(0, state.idolBuffTimer - 1);
           const cityDrinkBuffTimer = Math.max(0, state.cityDrinkBuffTimer - 1);
@@ -384,9 +551,10 @@ export const useGameStore = create(
             updatedCustomers.push(
               createCustomerInstance(state.level, (state.upgrades.vip_zone || 0) > 0)
             );
+            spawnedNewCustomer = true;
           }
 
-          // Staff auto-serving consumes real stock from inventory!
+          // Staff auto-serving consumes real stock!
           const staffLv = state.upgrades.hire_staff || 0;
           let bonusStaffCoins = 0;
           let nextInv = state.inventory;
@@ -396,7 +564,6 @@ export const useGameStore = create(
             if (targetIdx !== -1) {
               const targetCust = updatedCustomers[targetIdx];
               const teaId = targetCust.order.tea;
-              // Check if shop has enough tea & milk for staff to make the drink!
               if ((nextInv[teaId] ?? 0) >= 1 && (nextInv.milk ?? 0) >= 1) {
                 nextInv = {
                   ...nextInv,
@@ -460,7 +627,7 @@ export const useGameStore = create(
           let pvpBattle = state.onlineState.pvpBattle;
           if (pvpBattle.active && !pvpBattle.result) {
             const nextPvpTime = pvpBattle.timeLeft - 1;
-            const nextProg = Math.min(100, pvpBattle.opponentProgress + (3.2 + Math.random() * 2.5));
+            const nextProg = Math.min(100, pvpBattle.opponentProgress + (3.0 + Math.random() * 2.2));
             const nextStep = Math.min(6, Math.floor(nextProg / 17) + 1);
             if (nextProg >= 100 || nextPvpTime <= 0) {
               pvpBattle = {
@@ -525,15 +692,20 @@ export const useGameStore = create(
             },
           };
         });
+
+        if (spawnedNewCustomer && s.hasSeenIntro && (s.sceneMode === 'shop' || s.sceneMode === 'crafting')) {
+          sound.playDoorBell();
+        }
       },
 
-      // --- 6-STEP CRAFTING WITH FINITE STOCK DEDUCTION! ---
+      // --- EFFORTLESS 3-STEP CRAFTING WITH STRICT 0-STOCK LOCKING! ---
       selectCustomerAndCraft: (uid) => {
         sound.playClick();
+        const s = get();
         set({
           selectedCustomerUid: uid,
           sceneMode: 'crafting',
-          currentCup: defaultCup(),
+          currentCup: defaultCup(s.inventory),
           lastServeResult: null,
         });
       },
@@ -541,37 +713,30 @@ export const useGameStore = create(
       resetCup: () => {
         sound.playClick();
         const s = get();
-        // If cup hasn't been shaken yet, refund unmixed ingredients; if already shaken/ruined, ingredients are wasted!
+        if (s.currentCup.isServingAnim) return;
+        const inv = { ...s.inventory };
         if (s.currentCup.shakeProgress === 0) {
-          const inv = { ...s.inventory };
           if (s.currentCup.tea) inv[s.currentCup.tea] = (inv[s.currentCup.tea] ?? 0) + 1;
-          const prevMilkCost = MILK_OPTIONS.find((m) => m.id === s.currentCup.milk)?.stockCost || 0;
-          const prevSugarCost = SUGAR_OPTIONS.find((x) => x.id === s.currentCup.sugar)?.stockCost || 0;
-          const prevIceCost = ICE_OPTIONS.find((x) => x.id === s.currentCup.ice)?.stockCost || 0;
-          inv.milk = (inv.milk ?? 0) + prevMilkCost;
-          inv.sugar = (inv.sugar ?? 0) + prevSugarCost;
-          inv.ice = (inv.ice ?? 0) + prevIceCost;
           s.currentCup.toppings.forEach((tid) => {
             inv[tid] = (inv[tid] ?? 0) + 1;
           });
-          set({ inventory: inv, currentCup: defaultCup() });
+          set({ inventory: inv, currentCup: defaultCup(inv) });
         } else {
-          s.addPopup('🗑️ Đã đổ bỏ ly pha hỏng (mất nguyên liệu đã lắc)!', '#fb923c');
-          set({ currentCup: defaultCup() });
+          s.addPopup('🗑️ Đã bỏ ly cũ!', '#fb923c');
+          set({ currentCup: defaultCup(inv) });
         }
       },
 
       setCupTea: (teaId) => {
         const s = get();
-        if (s.currentCup.tea === teaId) return;
+        if (s.currentCup.isServingAnim || s.currentCup.tea === teaId) return;
         const inv = { ...s.inventory };
-        // Refund previous unshaken tea if switching
         if (s.currentCup.tea && s.currentCup.shakeProgress === 0) {
           inv[s.currentCup.tea] = (inv[s.currentCup.tea] ?? 0) + 1;
         }
         if ((inv[teaId] ?? 0) <= 0) {
           sound.playAngrySplat();
-          s.addPopup('⚠️ Kho đã HẾT loại trà này! Bấm "📦 Nhập Hàng" ngay!', '#f43f5e');
+          s.addPopup('⚠️ Đã HẾT vị trà này! Bấm "🚚 Nhập Đầy Kho" nhé!', '#f43f5e');
           return;
         }
         inv[teaId] -= 1;
@@ -584,67 +749,46 @@ export const useGameStore = create(
 
       setCupMilk: (milkVal) => {
         const s = get();
-        if (s.currentCup.milk === milkVal) return;
-        const inv = { ...s.inventory };
-        const prevCost = MILK_OPTIONS.find((m) => m.id === s.currentCup.milk)?.stockCost || 0;
+        if (s.currentCup.isServingAnim) return;
         const newCost = MILK_OPTIONS.find((m) => m.id === milkVal)?.stockCost || 0;
-        const avail = (inv.milk ?? 0) + (s.currentCup.shakeProgress === 0 ? prevCost : 0);
-
-        if (avail < newCost) {
+        if ((s.inventory.milk ?? 0) < newCost) {
           sound.playAngrySplat();
-          s.addPopup('⚠️ HẾT SỮA TƯƠI trong kho! Hãy bấm "📦 Nhập Hàng"!', '#f43f5e');
+          s.addPopup('⚠️ HẾT SỮA TƯƠI trong kho! Bấm "🚚 Nhập Đầy Kho"!', '#f43f5e');
           return;
         }
-        inv.milk = avail - newCost;
-        sound.playPour();
-        set({
-          inventory: inv,
-          currentCup: { ...s.currentCup, milk: milkVal, step: Math.max(s.currentCup.step, 3) },
-        });
+        sound.playPourMilk();
+        set({ currentCup: { ...s.currentCup, milk: milkVal } });
       },
 
       setCupSugar: (sugarVal) => {
         const s = get();
-        if (s.currentCup.sugar === sugarVal) return;
-        const inv = { ...s.inventory };
-        const prevCost = SUGAR_OPTIONS.find((x) => x.id === s.currentCup.sugar)?.stockCost || 0;
+        if (s.currentCup.isServingAnim) return;
         const newCost = SUGAR_OPTIONS.find((x) => x.id === sugarVal)?.stockCost || 0;
-        const avail = (inv.sugar ?? 0) + (s.currentCup.shakeProgress === 0 ? prevCost : 0);
-
-        if (avail < newCost) {
+        if ((s.inventory.sugar ?? 0) < newCost) {
           sound.playAngrySplat();
-          s.addPopup('⚠️ HẾT ĐƯỜNG trong kho! Hãy bấm "📦 Nhập Hàng"!', '#f43f5e');
+          s.addPopup('⚠️ HẾT ĐƯỜNG trong kho! Bấm "🚚 Nhập Đầy Kho"!', '#f43f5e');
           return;
         }
-        inv.sugar = avail - newCost;
         sound.playClick();
-        const next = { ...s.currentCup, sugar: sugarVal };
-        if (next.ice !== null) next.step = Math.max(next.step, 4);
-        set({ inventory: inv, currentCup: next });
+        set({ currentCup: { ...s.currentCup, sugar: sugarVal } });
       },
 
       setCupIce: (iceVal) => {
         const s = get();
-        if (s.currentCup.ice === iceVal) return;
-        const inv = { ...s.inventory };
-        const prevCost = ICE_OPTIONS.find((x) => x.id === s.currentCup.ice)?.stockCost || 0;
+        if (s.currentCup.isServingAnim) return;
         const newCost = ICE_OPTIONS.find((x) => x.id === iceVal)?.stockCost || 0;
-        const avail = (inv.ice ?? 0) + (s.currentCup.shakeProgress === 0 ? prevCost : 0);
-
-        if (avail < newCost) {
+        if ((s.inventory.ice ?? 0) < newCost) {
           sound.playAngrySplat();
-          s.addPopup('⚠️ HẾT ĐÁ VIÊN trong kho! Hãy bấm "📦 Nhập Hàng"!', '#f43f5e');
+          s.addPopup('⚠️ HẾT ĐÁ VIÊN trong kho! Bấm "🚚 Nhập Đầy Kho"!', '#f43f5e');
           return;
         }
-        inv.ice = avail - newCost;
         sound.playIceClink();
-        const next = { ...s.currentCup, ice: iceVal };
-        if (next.sugar !== null) next.step = Math.max(next.step, 4);
-        set({ inventory: inv, currentCup: next });
+        set({ currentCup: { ...s.currentCup, ice: iceVal } });
       },
 
       toggleCupTopping: (toppingId) => {
         const s = get();
+        if (s.currentCup.isServingAnim) return;
         const exists = s.currentCup.toppings.includes(toppingId);
         const inv = { ...s.inventory };
 
@@ -665,7 +809,7 @@ export const useGameStore = create(
 
         if ((inv[toppingId] ?? 0) <= 0) {
           sound.playAngrySplat();
-          s.addPopup('⚠️ HẾT TOPPING này trong tủ! Hãy bấm "📦 Nhập Hàng"!', '#f43f5e');
+          s.addPopup('⚠️ HẾT TOPPING này! Bấm "🚚 Nhập Đầy Kho" nhé!', '#f43f5e');
           return;
         }
 
@@ -676,7 +820,7 @@ export const useGameStore = create(
           currentCup: {
             ...s.currentCup,
             toppings: [...s.currentCup.toppings, toppingId],
-            step: Math.max(s.currentCup.step, 4),
+            step: Math.max(s.currentCup.step, 3),
           },
         });
       },
@@ -693,7 +837,7 @@ export const useGameStore = create(
         set((s) => ({ currentCup: { ...s.currentCup, step: 5 } }));
       },
 
-      shakeShaker: (amount = 18) => {
+      shakeShaker: (amount = 34) => {
         sound.playShake();
         set((s) => {
           const shakeProgress = Math.min(100, s.currentCup.shakeProgress + amount);
@@ -710,7 +854,62 @@ export const useGameStore = create(
         setTimeout(() => {
           sound.playSealMachine();
           set((s) => ({ currentCup: { ...s.currentCup, isSealed: true } }));
-        }, 480);
+        }, 400);
+      },
+
+      // ONE-TAP MAGIC SERVE (Step 3): Shake -> Seal -> Serve in 1.05s with real-life audio!
+      autoShakeSealAndServe: () => {
+        const s = get();
+        if (s.currentCup.isServingAnim) return;
+        const isAlien = s.alienQuest.active && s.alienQuest.stage === 'crafting';
+        if (!s.currentCup.tea && !isAlien) {
+          s.addPopup('🍓 Chọn 1 vị trà sữa ở Bước 1 trước nhé!', '#f43f5e');
+          return;
+        }
+
+        // Deduct milk, sugar, ice stock cleanly right on brew
+        const inv = { ...s.inventory };
+        const milkCost = MILK_OPTIONS.find((m) => m.id === s.currentCup.milk)?.stockCost || 0;
+        const sugarCost = SUGAR_OPTIONS.find((x) => x.id === s.currentCup.sugar)?.stockCost || 0;
+        const iceCost = ICE_OPTIONS.find((x) => x.id === s.currentCup.ice)?.stockCost || 0;
+
+        if ((inv.milk ?? 0) < milkCost || (inv.sugar ?? 0) < sugarCost || (inv.ice ?? 0) < iceCost) {
+          sound.playAngrySplat();
+          s.addPopup('⚠️ Thiếu Sữa/Đường/Đá trong kho! Bấm "🚚 Nhập Đầy Kho"!', '#f43f5e');
+          return;
+        }
+
+        inv.milk = Math.max(0, (inv.milk ?? 0) - milkCost);
+        inv.sugar = Math.max(0, (inv.sugar ?? 0) - sugarCost);
+        inv.ice = Math.max(0, (inv.ice ?? 0) - iceCost);
+
+        // Phase 1: Shake 1
+        sound.playShake();
+        set((st) => ({
+          inventory: inv,
+          currentCup: { ...st.currentCup, isServingAnim: true, step: 5, shakeProgress: 45 },
+        }));
+
+        // Phase 2: Shake 2
+        setTimeout(() => {
+          sound.playShake();
+          set((st) => ({
+            currentCup: { ...st.currentCup, shakeProgress: 100, isPoured: true, step: 6 },
+          }));
+        }, 280);
+
+        // Phase 3: Seal Cup
+        setTimeout(() => {
+          sound.playSealMachine();
+          set((st) => ({
+            currentCup: { ...st.currentCup, isSealed: true },
+          }));
+        }, 580);
+
+        // Phase 4: Serve to Customer!
+        setTimeout(() => {
+          get().serveFinishedCup();
+        }, 1020);
       },
 
       serveFinishedCup: () => {
@@ -739,19 +938,19 @@ export const useGameStore = create(
                   new Set([...state.character.badges, '👽 Người Pha Chế Thiên Hà'])
                 ),
               },
-              currentCup: defaultCup(),
+              currentCup: defaultCup(state.inventory),
             }));
           } else {
             sound.playAlienUFO();
-            set({
+            set((state) => ({
               alienQuest: {
                 active: true,
                 stage: 'failed_suck',
                 timeLeft: 0,
                 completedOnce: s.alienQuest.completedOnce,
               },
-              currentCup: defaultCup(),
-            });
+              currentCup: defaultCup(state.inventory),
+            }));
           }
           return;
         }
@@ -774,13 +973,13 @@ export const useGameStore = create(
                   new Set([...state.character.badges, '🏅 Huy Hiệu Độc Quyền Đại Chiến Pha Chế'])
                 ),
               },
-              currentCup: defaultCup(),
+              currentCup: defaultCup(state.inventory),
               activeModal: 'online',
             }));
           } else {
             sound.playAngrySplat();
             s.addPopup(`Sai công thức PvP (${acc.score}%)! Hãy pha lại!`, '#f43f5e');
-            set({ currentCup: defaultCup() });
+            set((state) => ({ currentCup: defaultCup(state.inventory) }));
           }
           return;
         }
@@ -800,7 +999,7 @@ export const useGameStore = create(
                   customTitle: 'Vua Pha Chế Boba Land 👑',
                   badges: Array.from(new Set([...state.character.badges, '👑 Quán Quân Vua Pha Chế'])),
                 },
-                currentCup: defaultCup(),
+                currentCup: defaultCup(state.inventory),
                 sceneMode: 'shop',
               }));
             } else {
@@ -808,21 +1007,21 @@ export const useGameStore = create(
               const nextRound = s.tournament.round + 1;
               const opponents = { 2: 'Thần Trà Matcha (Bán Kết)', 3: 'Trùm Cuối Hoàng Gia (Chung Kết)' };
               s.addPopup(`Thắng vòng ${s.tournament.round}! Tiến vào vòng sau!`, '#38bdf8');
-              set({
+              set((state) => ({
                 tournament: {
                   active: true,
                   round: nextRound,
                   opponent: opponents[nextRound],
-                  order: generateOrderForArchetype(pickRandom(CUSTOMER_ARCHETYPES), Math.max(6, s.level)),
+                  order: generateOrderForArchetype(pickRandom(CUSTOMER_ARCHETYPES), Math.max(4, s.level)),
                   timeLeft: 38 - nextRound * 3,
                 },
-                currentCup: defaultCup(),
-              });
+                currentCup: defaultCup(state.inventory),
+              }));
             }
           } else {
             sound.playAngrySplat();
             s.addPopup(`Độ chuẩn ${acc.score}% chưa đạt chuẩn Giải Đấu (>=80%)!`, '#f43f5e');
-            set({ currentCup: defaultCup() });
+            set((state) => ({ currentCup: defaultCup(state.inventory) }));
           }
           return;
         }
@@ -830,9 +1029,12 @@ export const useGameStore = create(
         const customer =
           s.customers.find((c) => c.uid === s.selectedCustomerUid) || s.customers[0];
         if (!customer) {
-          s.addCoinsAndXp(55, 15);
-          s.addPopup('+55 Xu (Bán mang về)', '#facc15');
-          set({ currentCup: defaultCup() });
+          sound.playSlurp();
+          sound.playCoin();
+          s.addCoinsAndXp(65, 18);
+          s.incrementQuest('serve_3', 1);
+          s.addPopup('+65 Xu (Bán mang về)', '#facc15');
+          set((state) => ({ currentCup: defaultCup(state.inventory) }));
           return;
         }
 
@@ -840,14 +1042,14 @@ export const useGameStore = create(
 
         if (evalRes.wrongTopping || evalRes.score < customer.strictAccuracy) {
           sound.playAngrySplat();
-          const starPenalty = customer.archetypeId === 'reviewer' ? -0.25 : -0.05;
+          const starPenalty = customer.archetypeId === 'reviewer' ? -0.2 : -0.05;
           set((state) => {
             const remaining = state.customers.filter((c) => c.uid !== customer.uid);
             return {
               shopStars: Math.max(1.0, Number((state.shopStars + starPenalty).toFixed(2))),
               customers: remaining,
               selectedCustomerUid: remaining[0]?.uid || null,
-              currentCup: defaultCup(),
+              currentCup: defaultCup(state.inventory),
               angrySplat: {
                 quote: customer.angryQuote,
                 customerName: `${customer.icon} ${customer.type}`,
@@ -866,15 +1068,18 @@ export const useGameStore = create(
           });
           setTimeout(() => {
             set((st) =>
-              st.angrySplat && Date.now() - st.angrySplat.timestamp >= 3200
+              st.angrySplat && Date.now() - st.angrySplat.timestamp >= 3000
                 ? { angrySplat: null }
                 : {}
             );
-          }, 3400);
+          }, 3200);
           return;
         }
 
-        sound.playCoin();
+        // Real Slurp + Cash Coins Sound!
+        sound.playSlurp();
+        setTimeout(() => sound.playCoin(), 220);
+
         let tipMultiplier = 1 + (evalRes.score - 60) / 80;
         SHOP_UPGRADES.forEach((u) => {
           tipMultiplier += (s.upgrades[u.id] || 0) * u.tipBonus;
@@ -886,32 +1091,43 @@ export const useGameStore = create(
         const xpEarned = Math.round(customer.xpReward * (evalRes.score / 85));
 
         s.addCoinsAndXp(coinsEarned, xpEarned);
+        s.incrementQuest('serve_3', 1);
         s.addPopup(`+${coinsEarned} Xu (${evalRes.score}% Chuẩn!)`, '#4ade80');
 
-        let specialComment = 'Ngon tuyệt cú mèo! Sẽ quay lại ủng hộ quán! 😍🧋';
+        // Track Recipe Mastery if cup matches a signature recipe!
+        const matchedRecipe = SIGNATURE_RECIPES.find(
+          (r) => r.tea === cup.tea && r.toppings.every((t) => cup.toppings.includes(t))
+        );
+
+        let specialComment = 'Ngon tuyệt cú mèo! Quán xinh quá sẽ quay lại liền! 😍🧋';
         let nextIdolBuff = s.idolBuffTimer;
         let starDelta = 0.03;
 
-        if (customer.archetypeId === 'idol' && evalRes.score >= 85) {
+        if (customer.archetypeId === 'idol' && evalRes.score >= 82) {
           nextIdolBuff = 45;
-          specialComment = '🌟 IDOL LIVESTREAM QUẢNG CÁO QUÁN! Khách kéo đến gấp đôi trong 45s!!';
+          specialComment = '🌟 IDOL ĐĂNG STORY QUẢNG CÁO! Khách kéo đến gấp đôi trong 45s!!';
           confetti({ particleCount: 65, spread: 60 });
         } else if (customer.archetypeId === 'reviewer') {
           starDelta = 0.15;
-          specialComment = '📸 Reviewer chấm 10/10 điểm! Uy tín sao của quán tăng mạnh! ⭐';
+          specialComment = '📸 Reviewer chấm 10/10 điểm! Uy tín quán tăng vọt ⭐';
         } else if (customer.archetypeId === 'tycoon') {
-          specialComment = '💎 Đại Gia cực kỳ ưng ý, thưởng nóng tiền boa kim cương!';
+          specialComment = '💎 Đại Gia siêu ưng ý, thưởng nóng tiền boa kim cương!';
         }
 
         set((state) => {
           const remaining = state.customers.filter((c) => c.uid !== customer.uid);
+          const nextMastery = { ...(state.recipeMastery || {}) };
+          if (matchedRecipe) {
+            nextMastery[matchedRecipe.id] = (nextMastery[matchedRecipe.id] || 0) + 1;
+          }
           return {
             totalCupsServed: state.totalCupsServed + 1,
             shopStars: Math.min(5.0, Number((state.shopStars + starDelta).toFixed(2))),
             idolBuffTimer: nextIdolBuff,
             customers: remaining,
             selectedCustomerUid: remaining[0]?.uid || null,
-            currentCup: defaultCup(),
+            currentCup: defaultCup(state.inventory),
+            recipeMastery: nextMastery,
             festivalProgress: {
               ...state.festivalProgress,
               drinksCrafted: state.festivalProgress.drinksCrafted + 1,
@@ -1017,11 +1233,12 @@ export const useGameStore = create(
 
       acceptAlienCrafting: () => {
         sound.playClick();
-        set((s) => ({
+        const s = get();
+        set({
           sceneMode: 'crafting',
-          currentCup: defaultCup(),
+          currentCup: defaultCup(s.inventory),
           alienQuest: { ...s.alienQuest, stage: 'crafting', timeLeft: 60 },
-        }));
+        });
       },
 
       closeAlienQuest: () => {
@@ -1057,11 +1274,12 @@ export const useGameStore = create(
 
       startPvpBattle: () => {
         sound.playSuccessFanfare();
-        const sharedOrder = generateOrderForArchetype(CUSTOMER_ARCHETYPES[0], get().level);
-        set((s) => ({
+        const s = get();
+        const sharedOrder = generateOrderForArchetype(CUSTOMER_ARCHETYPES[0], s.level);
+        set({
           activeModal: null,
           sceneMode: 'crafting',
-          currentCup: defaultCup(),
+          currentCup: defaultCup(s.inventory),
           onlineState: {
             ...s.onlineState,
             pvpBattle: {
@@ -1074,7 +1292,7 @@ export const useGameStore = create(
               result: null,
             },
           },
-        }));
+        });
       },
 
       sendWorldChat: (text, senderOverride = null) => {
@@ -1125,7 +1343,7 @@ export const useGameStore = create(
           s.addPopup('Chưa đủ Xu để mua trà sữa quán bạn!', '#f43f5e');
           return;
         }
-        sound.playPour();
+        sound.playSlurp();
         s.addCoinsAndXp(-shop.drinkPrice, 35);
         s.addPopup(`🧋 Đã thưởng thức ${shop.specialty}! Buff +25% tiền boa 60s!`, '#38bdf8');
         set({ cityDrinkBuffTimer: 60 });
@@ -1203,18 +1421,19 @@ export const useGameStore = create(
 
       startTournament: () => {
         sound.playSuccessFanfare();
-        set((s) => ({
+        const s = get();
+        set({
           activeModal: null,
           sceneMode: 'crafting',
-          currentCup: defaultCup(),
+          currentCup: defaultCup(s.inventory),
           tournament: {
             active: true,
             round: 1,
             opponent: 'Cao Thủ Hồng Trà (Tứ Kết)',
-            order: generateOrderForArchetype(CUSTOMER_ARCHETYPES[3], Math.max(6, s.level)),
+            order: generateOrderForArchetype(CUSTOMER_ARCHETYPES[3], Math.max(4, s.level)),
             timeLeft: 42,
           },
-        }));
+        });
       },
 
       claimFestivalReward: () => {
@@ -1240,6 +1459,8 @@ export const useGameStore = create(
           coins: s.coins + 50000,
           level: Math.max(s.level, 52),
           shopStars: 5.0,
+          unlockedThemes: ['sakura', 'matcha', 'paris', 'seoul'],
+          luckyWheelFreeSpins: 5,
           upgrades: {
             sealer_pro: 3,
             furniture_set: 4,
@@ -1251,6 +1472,7 @@ export const useGameStore = create(
           },
           inventory: {
             black_tea: 35,
+            strawberry_tea: 35,
             green_tea: 35,
             oolong_tea: 35,
             taro_tea: 35,
@@ -1268,17 +1490,17 @@ export const useGameStore = create(
             sakura_city: true,
           },
         }));
-        get().addPopup('⚡ Đã mở khóa Vua Trà Sữa + Kho Nguyên Liệu Đầy 35/35!', '#facc15');
+        get().addPopup('⚡ Đã mở khóa Vua Trà Sữa + 4 Style Quán + Full Kho!', '#facc15');
       },
 
       resetNewGame: () => {
-        localStorage.removeItem('boba-tycoon-3d-save');
+        localStorage.removeItem('boba-tycoon-3d-save-v5');
         window.location.reload();
       },
     }),
     {
-      name: 'boba-tycoon-3d-save-v4',
-      version: 4,
+      name: 'boba-tycoon-3d-save-v5',
+      version: 5,
       merge: (persistedState, currentState) => {
         const ps = persistedState || {};
         return {
@@ -1296,6 +1518,11 @@ export const useGameStore = create(
             ...defaultInventory(),
             ...(ps.inventory || {}),
           },
+          dailyQuests: {
+            ...defaultDailyQuests(),
+            ...(ps.dailyQuests || {}),
+          },
+          unlockedThemes: ps.unlockedThemes || ['sakura', 'matcha'],
         };
       },
       partialize: (state) => ({
@@ -1309,6 +1536,12 @@ export const useGameStore = create(
         shopStars: state.shopStars,
         totalCupsServed: state.totalCupsServed,
         inventory: state.inventory,
+        shopTheme: state.shopTheme,
+        unlockedThemes: state.unlockedThemes,
+        recipeMastery: state.recipeMastery,
+        dailyQuests: state.dailyQuests,
+        luckyWheelFreeSpins: state.luckyWheelFreeSpins,
+        photoCount: state.photoCount,
         upgrades: state.upgrades,
         franchises: state.franchises,
         character: state.character,
@@ -1322,14 +1555,14 @@ export function evaluateAccuracy(cup, order) {
   let score = 100;
   let wrongTopping = false;
 
-  if (cup.tea !== order.tea) score -= 30;
-  if (cup.milk !== order.milk) score -= Math.abs((cup.milk ?? 0) - order.milk) === 50 ? 12 : 25;
+  if (cup.tea !== order.tea) score -= 35;
+  if (cup.milk !== order.milk) score -= Math.abs((cup.milk ?? 0) - order.milk) === 50 ? 10 : 22;
   if (cup.sugar !== order.sugar) {
     const diff = Math.abs((cup.sugar ?? 50) - order.sugar);
-    score -= Math.min(25, Math.round(diff * 0.3));
+    score -= Math.min(20, Math.round(diff * 0.25));
   }
   if (cup.ice !== order.ice) {
-    score -= Math.abs((cup.ice ?? 50) - order.ice) === 50 ? 10 : 20;
+    score -= Math.abs((cup.ice ?? 50) - order.ice) === 50 ? 8 : 16;
   }
 
   const extraToppings = cup.toppings.filter((t) => !order.toppings.includes(t));
@@ -1343,8 +1576,8 @@ export function evaluateAccuracy(cup, order) {
     score -= missingToppings.length * 22;
   }
 
-  if (cup.shakeProgress < 80) score -= 15;
-  if (!cup.isSealed) score -= 25;
+  if (cup.shakeProgress < 80) score -= 12;
+  if (!cup.isSealed) score -= 20;
 
   return {
     score: Math.max(0, Math.min(100, score)),

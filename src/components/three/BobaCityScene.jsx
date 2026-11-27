@@ -41,7 +41,7 @@ function WanderingOnlineCitizen({ bot, idx, isParty }) {
         addFriend(bot.name);
       }}
     >
-      <AnimatedCharacter3D path={bot.model} anim={isParty ? 'wave' : 'walk'} scale={1.0} />
+      <AnimatedCharacter3D path={bot.model} anim={isParty ? 'run' : 'walk'} scale={1.0} />
     </group>
   );
 }
@@ -52,6 +52,7 @@ export default function BobaCityScene() {
   const character = useGameStore((s) => s.character);
   const partyTimeLeft = useGameStore((s) => s.onlineState.partyTimeLeft);
   const buyBobaFromOtherShop = useGameStore((s) => s.buyBobaFromOtherShop);
+  const petCafeAnimal = useGameStore((s) => s.petCafeAnimal);
 
   const playerRef = useRef();
   const partyOrbsRef = useRef();
@@ -154,8 +155,8 @@ export default function BobaCityScene() {
           );
         }}
       >
-        <planeGeometry args={[56, 56]} />
-        <meshStandardMaterial color="#76b07d" roughness={0.9} />
+        <planeGeometry args={[58, 58]} />
+        <meshStandardMaterial color="#8bc596" roughness={0.9} />
       </mesh>
 
       <mesh
@@ -171,33 +172,48 @@ export default function BobaCityScene() {
           );
         }}
       >
-        <circleGeometry args={[13.2, 44]} />
-        <meshStandardMaterial color="#e3d5ca" roughness={0.8} />
+        <circleGeometry args={[13.6, 48]} />
+        <meshStandardMaterial color="#f5ebe0" roughness={0.78} />
       </mesh>
 
-      <ModelGLB path="/models/quaternius/tree_sakura.glb" position={[-6.5, 0, -5.5]} scale={1.55} castShadow={false} />
-      <ModelGLB path="/models/quaternius/tree_green.glb" position={[6.5, 0, -5.5]} scale={1.55} castShadow={false} />
-      <ModelGLB path="/models/quaternius/tree_green.glb" position={[-6.5, 0, 5.5]} scale={1.55} castShadow={false} />
-      <ModelGLB path="/models/quaternius/tree_sakura.glb" position={[6.5, 0, 5.5]} scale={1.55} castShadow={false} />
-      <ModelGLB path="/models/quaternius/streetlight.glb" position={[-3.8, 0, -3.8]} scale={2.4} castShadow={false} />
-      <ModelGLB path="/models/quaternius/streetlight.glb" position={[3.8, 0, -3.8]} scale={2.4} castShadow={false} />
-      <ModelGLB path="/models/quaternius/streetlight.glb" position={[-3.8, 0, 3.8]} scale={2.4} castShadow={false} />
-      <ModelGLB path="/models/quaternius/streetlight.glb" position={[3.8, 0, 3.8]} scale={2.4} castShadow={false} />
-      <AnimatedAnimal3D path="/models/quaternius/pet_shiba.glb" anim="Idle_2" scale={0.24} position={[2.8, 0, 1.8]} />
-      <AnimatedAnimal3D path="/models/quaternius/pet_alpaca.glb" anim="Idle" scale={0.23} position={[-2.8, 0, 1.8]} />
+      {/* Lush Sakura Trees, Cafe Parasols, Scooters & Pettable Animals in Plaza! */}
+      <ModelGLB path="/models/cafe/sakura_tree.glb" position={[-6.8, 0, -5.8]} scale={1.15} castShadow={false} />
+      <ModelGLB path="/models/cafe/sakura_tree.glb" position={[6.8, 0, -5.8]} scale={1.15} castShadow={false} />
+      <ModelGLB path="/models/cafe/sakura_tree.glb" position={[-6.8, 0, 5.8]} scale={1.1} castShadow={false} />
+      <ModelGLB path="/models/cafe/sakura_tree.glb" position={[6.8, 0, 5.8]} scale={1.1} castShadow={false} />
+      <ModelGLB path="/models/cafe/parasol.glb" position={[-4.5, 0, 0]} scale={0.95} />
+      <ModelGLB path="/models/cafe/parasol.glb" position={[4.5, 0, 0]} scale={0.95} />
+      <ModelGLB path="/models/cafe/scooter.glb" position={[-3.2, 0, 4.2]} rotation={[0, 0.9, 0]} scale={1.0} />
+      <ModelGLB path="/models/cafe/bicycle.glb" position={[3.4, 0, 4.0]} rotation={[0, -0.7, 0]} scale={1.0} />
 
+      <AnimatedAnimal3D
+        path="/models/cafe/pet_dog.glb"
+        anim="Idle"
+        scale={0.95}
+        position={[2.9, 0, 1.8]}
+        onClick={() => petCafeAnimal('Cún Quảng Trường')}
+      />
+      <AnimatedAnimal3D
+        path="/models/cafe/pet_cat.glb"
+        anim="Lounge"
+        scale={1.45}
+        position={[-2.9, 0, 1.8]}
+        onClick={() => petCafeAnimal('Mèo Quảng Trường')}
+      />
+
+      {/* Central Boba Monument Fountain */}
       <group position={[0, 0, 0]}>
         <mesh receiveShadow castShadow position={[0, 0.3, 0]}>
           <cylinderGeometry args={[2.2, 2.5, 0.6, 28]} />
-          <meshStandardMaterial color="#b08968" roughness={0.68} />
+          <meshStandardMaterial color="#f5ebe0" roughness={0.55} />
         </mesh>
         <mesh position={[0, 0.56, 0]}>
           <cylinderGeometry args={[1.95, 1.95, 0.16, 28]} />
-          <meshStandardMaterial color="#38bdf8" roughness={0.2} />
+          <meshStandardMaterial color="#7dd3fc" roughness={0.18} />
         </mesh>
         <BobaCup3D
           cup={{
-            tea: 'oolong_tea',
+            tea: 'strawberry_tea',
             milk: 100,
             ice: 100,
             toppings: ['pearl', 'golden_boba', 'cheese_foam'],
@@ -219,13 +235,16 @@ export default function BobaCityScene() {
             buyBobaFromOtherShop(shop);
           }}
         >
-          <ModelGLB path={shop.buildingModel} scale={1.38} />
-          <ModelGLB path="/models/furniture/tableRound.glb" position={[0, 0, 3.2]} scale={1.9} />
-          <ModelGLB path="/models/food/frappe.glb" position={[0, 0.71, 3.2]} scale={0.42} />
+          <ModelGLB path={shop.buildingModel} scale={0.95} />
+          <ModelGLB path="/models/cafe/bistro_table.glb" position={[0, 0, 2.9]} scale={1.05} />
+          <ModelGLB path="/models/cafe/takeaway_cup.glb" position={[0, 0.78, 2.9]} scale={1.3} />
         </group>
       ))}
 
-      {ONLINE_BOT_PLAYERS.map((bot, idx) => (
+      {(typeof window !== 'undefined' && window.innerWidth < 820
+        ? ONLINE_BOT_PLAYERS.slice(0, 3)
+        : ONLINE_BOT_PLAYERS
+      ).map((bot, idx) => (
         <WanderingOnlineCitizen
           key={bot.id}
           bot={bot}
@@ -240,17 +259,16 @@ export default function BobaCityScene() {
         </group>
       ))}
 
-      {/* Controllable Local Player Avatar with Golden Ring Marker Under Feet */}
+      {/* Controllable Local Player Avatar */}
       <group ref={playerRef} position={[0, 0, 3.8]}>
         <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.38, 0.48, 28]} />
           <meshBasicMaterial color="#fb6f92" />
         </mesh>
         <AnimatedCharacter3D
-          presetKey={character.modelId}
           path={activeOutfit.path}
-          anim={partyTimeLeft > 0 ? 'wave' : isPlayerMoving ? 'run' : 'idle'}
-          scale={1.05}
+          anim={partyTimeLeft > 0 ? 'run' : isPlayerMoving ? 'run' : 'idle'}
+          scale={1.0}
         >
           <PlayerAccessories3D hatId={character.hatId} petId={character.petId} />
         </AnimatedCharacter3D>

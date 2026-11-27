@@ -3,32 +3,33 @@ import { useFrame } from '@react-three/fiber';
 import gsap from 'gsap';
 import * as THREE from 'three';
 import { TEA_BASES } from '../../data/gameData';
+import { getBobaCupStickerTexture, getTigerStripeTexture } from './cafeTextures';
 
-const PEARL_GEO = new THREE.SphereGeometry(0.074, 12, 12);
+const PEARL_GEO = new THREE.SphereGeometry(0.075, 14, 14);
 const JELLY_GEO = new THREE.BoxGeometry(0.105, 0.085, 0.105);
 const ICE_GEO = new THREE.BoxGeometry(0.145, 0.145, 0.145);
 
 const BLACK_PEARL_MAT = new THREE.MeshStandardMaterial({
   color: '#1b0f0a',
-  roughness: 0.14,
-  metalness: 0.12,
+  roughness: 0.12,
+  metalness: 0.14,
 });
 const GOLD_PEARL_MAT = new THREE.MeshStandardMaterial({
   color: '#f59e0b',
-  roughness: 0.16,
+  roughness: 0.15,
   metalness: 0.28,
 });
 const JELLY_MAT = new THREE.MeshStandardMaterial({
   color: '#e0f2fe',
   transparent: true,
   opacity: 0.85,
-  roughness: 0.18,
+  roughness: 0.16,
 });
 const ICE_MAT = new THREE.MeshStandardMaterial({
   color: '#bae6fd',
   transparent: true,
-  opacity: 0.76,
-  roughness: 0.1,
+  opacity: 0.74,
+  roughness: 0.08,
   metalness: 0.05,
 });
 
@@ -46,23 +47,29 @@ export default function BobaCup3D({
   const dropGroupRef = useRef();
   const heartsRef = useRef();
 
-  // Compute translucent tea + creamy milk blend color
+  const stickerTex = useMemo(() => getBobaCupStickerTexture(), []);
+  const tigerTex = useMemo(() => getTigerStripeTexture(), []);
+
+  const teaObj = useMemo(() => {
+    if (!cup?.tea) return null;
+    return TEA_BASES.find((t) => t.id === cup.tea) || TEA_BASES[0];
+  }, [cup?.tea]);
+
   const { teaPureColor, liquidColor } = useMemo(() => {
-    if (!cup?.tea) return { teaPureColor: null, liquidColor: null };
-    const teaObj = TEA_BASES.find((t) => t.id === cup.tea) || TEA_BASES[0];
+    if (!teaObj) return { teaPureColor: null, liquidColor: null };
     const baseC = new THREE.Color(teaObj.color);
     const milkC = new THREE.Color(teaObj.milkColor);
-    const ratio = cup.milk === null ? 0 : cup.milk / 100;
+    const ratio = cup.milk === null || cup.milk === undefined ? 0.5 : cup.milk / 100;
     return {
       teaPureColor: teaObj.color,
       liquidColor: '#' + baseC.clone().lerp(milkC, ratio).getHexString(),
     };
-  }, [cup?.tea, cup?.milk]);
+  }, [teaObj, cup?.milk]);
 
-  const targetFill = !cup?.tea ? 0 : cup?.milk !== null ? 1.0 : 0.62;
+  const targetFill = !cup?.tea ? 0 : cup?.milk > 0 ? 1.0 : 0.75;
   const toppingCountKey = `${cup?.toppings?.join(',')}_${cup?.pearl200}_${cup?.pudding5}_${cup?.ice}`;
 
-  // GSAP Physics Drop Effect whenever new toppings or ice are dropped into the cup!
+  // GSAP Bouncy Physics Drop whenever toppings or ice are added!
   useEffect(() => {
     if (!dropGroupRef.current) return;
     if (!cup?.toppings?.length && !cup?.ice && !cup?.pearl200) return;
@@ -70,15 +77,14 @@ export default function BobaCup3D({
     gsap.killTweensOf(dropGroupRef.current.position);
     gsap.fromTo(
       dropGroupRef.current.position,
-      { y: 1.15 },
-      { y: 0, duration: 0.58, ease: 'bounce.out' }
+      { y: 1.05 },
+      { y: 0, duration: 0.52, ease: 'bounce.out' }
     );
-    // Subtle cup squish-pop feedback
     if (groupRef.current) {
       gsap.fromTo(
         groupRef.current.scale,
         { x: scale * 1.08, y: scale * 0.93, z: scale * 1.08 },
-        { x: scale, y: scale, z: scale, duration: 0.42, ease: 'elastic.out(1, 0.4)' }
+        { x: scale, y: scale, z: scale, duration: 0.4, ease: 'elastic.out(1, 0.4)' }
       );
     }
   }, [toppingCountKey, scale]);
@@ -92,22 +98,20 @@ export default function BobaCup3D({
       liquidRef.current.scale.y = THREE.MathUtils.lerp(
         liquidRef.current.scale.y,
         targetFill,
-        delta * 5.5
+        Math.min(1, delta * 12.0)
       );
     }
-    // Dynamic floating & swirling pearls inside translucent tea!
     if (pearlsGroupRef.current) {
-      const swirlSpeed = cup?.shakeProgress > 0 && cup?.shakeProgress < 100 ? 5.5 : 0.45;
+      const swirlSpeed = cup?.shakeProgress > 0 && cup?.shakeProgress < 100 ? 7.0 : 0.45;
       pearlsGroupRef.current.rotation.y += delta * swirlSpeed;
       pearlsGroupRef.current.children.forEach((pMesh, idx) => {
         pMesh.position.y = pMesh.userData.baseY + Math.sin(t * 2.6 + idx * 0.9) * 0.025;
       });
     }
-    // Floating bobbing ice cubes on liquid surface
     if (iceGroupRef.current) {
       iceGroupRef.current.rotation.y = Math.sin(t * 0.8) * 0.25;
       iceGroupRef.current.children.forEach((iMesh, idx) => {
-        iMesh.position.y = iMesh.userData.baseY + Math.sin(t * 2.2 + idx) * 0.035;
+        iMesh.position.y = iMesh.userData.baseY + Math.sin(t * 2.2 + idx) * 0.032;
       });
     }
     if (heartsRef.current) {
@@ -121,14 +125,14 @@ export default function BobaCup3D({
     const hasGold = cup?.toppings?.includes('golden_boba');
     if (!hasBlack && !hasGold) return [];
 
-    const count = cup?.pearl200 ? 48 : (hasBlack ? 15 : 0) + (hasGold ? 13 : 0);
+    const count = cup?.pearl200 ? 48 : (hasBlack ? 16 : 0) + (hasGold ? 14 : 0);
     const arr = [];
     for (let i = 0; i < count; i++) {
       const layer = Math.floor(i / 12);
       const angle = (i * 2.39996) % (Math.PI * 2);
       const maxR = 0.31 + layer * 0.025;
-      const r = (0.15 + ((i * 7) % 10) / 10 * 0.8) * maxR;
-      const y = -0.6 + layer * 0.115 + ((i % 3) * 0.015);
+      const r = (0.15 + (((i * 7) % 10) / 10) * 0.8) * maxR;
+      const y = -0.6 + layer * 0.115 + (i % 3) * 0.015;
       const isGold = hasGold && (!hasBlack || i % 2 === 1) && !cup?.pearl200;
       arr.push({
         pos: [Math.cos(angle) * r, Math.min(0.42, y), Math.sin(angle) * r],
@@ -145,7 +149,7 @@ export default function BobaCup3D({
     return Array.from({ length: count }, (_, i) => {
       const angle = (i / count) * Math.PI * 2 + 0.4;
       const r = 0.2 + (i % 2) * 0.11;
-      const baseY = 0.22 + (i % 3) * 0.11;
+      const baseY = 0.24 + (i % 3) * 0.1;
       return {
         pos: [Math.cos(angle) * r, baseY, Math.sin(angle) * r],
         baseY,
@@ -172,33 +176,47 @@ export default function BobaCup3D({
       {liquidColor && (
         <group position={[0, -0.7, 0]} ref={liquidRef} scale={[1, 0.1, 1]}>
           <mesh position={[0, 0.65, 0]}>
-            <cylinderGeometry args={[0.55, 0.4, 1.3, 28]} />
+            <cylinderGeometry args={[0.55, 0.4, 1.3, 30]} />
             <meshStandardMaterial
               color={liquidColor}
               roughness={0.22}
-              metalness={0.03}
+              metalness={0.02}
               transparent
-              opacity={cup.milk > 0 ? 0.88 : 0.72}
+              opacity={cup.milk > 0 ? 0.9 : 0.76}
             />
           </mesh>
           {/* Creamy Milk Foam Ring on Top of Liquid */}
           {cup.milk > 0 && (
             <mesh position={[0, 1.31, 0]}>
-              <cylinderGeometry args={[0.555, 0.55, 0.04, 28]} />
-              <meshStandardMaterial color="#fffbeb" roughness={0.4} />
+              <cylinderGeometry args={[0.555, 0.55, 0.05, 28]} />
+              <meshStandardMaterial color="#fffbeb" roughness={0.38} />
             </mesh>
           )}
         </group>
       )}
 
-      {/* Animated Milk / Tea Pouring Stream + Splash Ring! */}
+      {/* Realistic Caramelized Brown-Sugar Tiger Stripes Inside Cup! */}
+      {teaObj?.hasTigerStripes && tigerTex && (
+        <mesh position={[0, -0.02, 0]}>
+          <cylinderGeometry args={[0.59, 0.425, 1.38, 28, 1, true]} />
+          <meshStandardMaterial
+            map={tigerTex}
+            transparent
+            opacity={0.85}
+            roughness={0.2}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+
+      {/* Animated Liquid Pouring Stream + Splash Ring */}
       {isPouring && liquidColor && (
         <group>
           <mesh position={[0, 1.18, 0]}>
             <cylinderGeometry args={[0.05, 0.085, 1.38, 14]} />
             <meshStandardMaterial
               color={cup?.milk > 0 ? '#fffbeb' : teaPureColor || liquidColor}
-              roughness={0.2}
+              roughness={0.18}
             />
           </mesh>
           <mesh position={[0, 0.56, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -210,19 +228,17 @@ export default function BobaCup3D({
 
       {/* Bouncy Drop Container for Toppings & Ice */}
       <group ref={dropGroupRef}>
-        {/* Pudding Layers */}
         {puddingLayers > 0 &&
           Array.from({ length: puddingLayers }, (_, idx) => (
             <mesh key={`pud_${idx}`} position={[0, -0.52 + idx * 0.155, 0]}>
               <cylinderGeometry args={[0.42 + idx * 0.02, 0.4 + idx * 0.02, 0.115, 24]} />
               <meshStandardMaterial
                 color={idx % 2 === 0 ? '#fde047' : '#facc15'}
-                roughness={0.28}
+                roughness={0.26}
               />
             </mesh>
           ))}
 
-        {/* Dynamic Bobbing & Swirling Tapioca Pearls */}
         <group ref={pearlsGroupRef}>
           {pearls.map((p, idx) => (
             <mesh
@@ -235,7 +251,6 @@ export default function BobaCup3D({
           ))}
         </group>
 
-        {/* Coconut Jelly Cubes */}
         {jellies.map((pos, idx) => (
           <mesh
             key={`j_${idx}`}
@@ -246,7 +261,6 @@ export default function BobaCup3D({
           />
         ))}
 
-        {/* Bobbing Ice Cubes */}
         <group ref={iceGroupRef}>
           {iceCubes.map((ice, idx) => (
             <mesh
@@ -261,12 +275,25 @@ export default function BobaCup3D({
         </group>
       </group>
 
-      {/* Salted Cheese Foam Swirl */}
+      {/* Salted Cheese Foam Dome + Fresh Strawberry Garnish */}
       {hasCheeseFoam && (
-        <mesh position={[0, 0.62, 0]}>
-          <cylinderGeometry args={[0.57, 0.54, 0.16, 26]} />
-          <meshStandardMaterial color="#fffbeb" roughness={0.45} />
+        <mesh position={[0, 0.64, 0]}>
+          <cylinderGeometry args={[0.57, 0.54, 0.19, 28]} />
+          <meshStandardMaterial color="#fffbeb" roughness={0.42} />
         </mesh>
+      )}
+
+      {teaObj?.hasBerryGarnish && (
+        <group position={[-0.2, 0.72, 0.16]} rotation={[0.2, 0.4, 0.3]}>
+          <mesh>
+            <coneGeometry args={[0.12, 0.2, 14]} />
+            <meshStandardMaterial color="#e11d48" roughness={0.3} />
+          </mesh>
+          <mesh position={[0, -0.09, 0]}>
+            <cylinderGeometry args={[0.09, 0.04, 0.04, 8]} />
+            <meshStandardMaterial color="#22c55e" roughness={0.5} />
+          </mesh>
+        </group>
       )}
 
       {/* Love Spice Floating Orbs */}
@@ -284,49 +311,53 @@ export default function BobaCup3D({
         </group>
       )}
 
-      {/* PBR Refractive Glass Cup Shell (Crisp specular rim sheen, translucent body!) */}
+      {/* Clear Glossy Boba Cup Shell */}
       <mesh position={[0, 0, 0]}>
-        <cylinderGeometry args={[0.62, 0.44, 1.54, 28, 1, true]} />
+        <cylinderGeometry args={[0.62, 0.44, 1.54, 30, 1, true]} />
         <meshStandardMaterial
-          color="#e0f2fe"
+          color="#f0f9ff"
           transparent
-          opacity={0.24}
-          roughness={0.09}
-          metalness={0.12}
+          opacity={0.22}
+          roughness={0.07}
+          metalness={0.1}
           depthWrite={false}
         />
       </mesh>
 
-      {/* Cute Bear/Boba Emblem Badge on Front of Cup */}
-      <mesh position={[0, 0.05, 0.535]} rotation={[0.11, 0, 0]}>
-        <circleGeometry args={[0.2, 24]} />
-        <meshStandardMaterial color="#f472b6" roughness={0.4} />
-      </mesh>
-      <mesh position={[0, 0.05, 0.54]} rotation={[0.11, 0, 0]}>
-        <circleGeometry args={[0.14, 24]} />
-        <meshStandardMaterial color="#fff1f2" roughness={0.4} />
-      </mesh>
+      {/* Kawaii Boba Bear Sticker on Front & Back of Cup! */}
+      {stickerTex && (
+        <>
+          <mesh position={[0, 0.04, 0.545]} rotation={[-0.11, 0, 0]}>
+            <circleGeometry args={[0.25, 28]} />
+            <meshStandardMaterial map={stickerTex} transparent roughness={0.35} />
+          </mesh>
+          <mesh position={[0, 0.04, -0.545]} rotation={[0.11, Math.PI, 0]}>
+            <circleGeometry args={[0.25, 28]} />
+            <meshStandardMaterial map={stickerTex} transparent roughness={0.35} />
+          </mesh>
+        </>
+      )}
 
-      {/* Cup Base & Rolled Lip Rim */}
+      {/* Cup Base & Rolled Rim */}
       <mesh position={[0, -0.76, 0]}>
         <cylinderGeometry args={[0.44, 0.43, 0.06, 28]} />
-        <meshStandardMaterial color="#cbd5e1" transparent opacity={0.55} roughness={0.2} />
+        <meshStandardMaterial color="#e2e8f0" transparent opacity={0.55} roughness={0.2} />
       </mesh>
       <mesh position={[0, 0.77, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[0.62, 0.032, 12, 32]} />
-        <meshStandardMaterial color="#f8fafc" roughness={0.3} />
+        <meshStandardMaterial color="#ffffff" roughness={0.25} />
       </mesh>
 
-      {/* Sealed Plastic Lid + Wide Boba Straw */}
+      {/* Cute Sealed Pastel Lid + Wide Boba Straw */}
       {cup?.isSealed && (
         <group>
           <mesh position={[0, 0.78, 0]}>
-            <cylinderGeometry args={[0.62, 0.62, 0.025, 28]} />
-            <meshStandardMaterial color="#fbcfe8" transparent opacity={0.86} roughness={0.25} />
+            <cylinderGeometry args={[0.625, 0.625, 0.03, 28]} />
+            <meshStandardMaterial color="#fbcfe8" transparent opacity={0.88} roughness={0.22} />
           </mesh>
-          <mesh position={[0.08, 1.06, 0]} rotation={[0, 0, -0.14]}>
-            <cylinderGeometry args={[0.072, 0.072, 1.42, 18]} />
-            <meshStandardMaterial color="#ec4899" roughness={0.25} />
+          <mesh position={[0.08, 1.08, 0]} rotation={[0, 0, -0.14]}>
+            <cylinderGeometry args={[0.072, 0.072, 1.44, 18]} />
+            <meshStandardMaterial color="#fb7185" roughness={0.22} />
           </mesh>
         </group>
       )}

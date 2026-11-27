@@ -1,10 +1,27 @@
-// Procedural Web Audio API Sound Engine & Cozy Boba Cafe BGM
+// Real-Life Studio Audio Engine (Mixkit Real Recordings + Cozy Cafe BGM)
+const AUDIO_FILES = {
+  pour_tea: '/audio/pour_tea.mp3',
+  pour_milk: '/audio/pour_milk.mp3',
+  ice_drop: '/audio/ice_drop.mp3',
+  boba_plop: '/audio/boba_plop.mp3',
+  glass_clink: '/audio/glass_clink.mp3',
+  slurp: '/audio/slurp.mp3',
+  door_bell: '/audio/door_bell.mp3',
+  happy_bell: '/audio/happy_bell.mp3',
+  cash_coins: '/audio/cash_coins.mp3',
+  coin_win: '/audio/coin_win.mp3',
+  kitty_meow: '/audio/kitty_meow.mp3',
+  cafe_bgm: '/audio/cafe_bgm.mp3',
+};
+
 class SoundEngine {
   constructor() {
     this.ctx = null;
     this.sfxEnabled = true;
     this.bgmEnabled = false;
-    this.bgmInterval = null;
+    this.cache = {};
+    this.bgmAudio = null;
+    this.preloaded = false;
   }
 
   init() {
@@ -15,142 +32,156 @@ class SoundEngine {
       }
     }
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
+      this.ctx.resume().catch(() => {});
     }
   }
 
-  playTone(freq, type = 'sine', duration = 0.14, gainVal = 0.12, slideTo = null) {
-    if (!this.sfxEnabled) return;
-    this.init();
-    if (!this.ctx) return;
-
-    const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, now);
-    if (slideTo) {
-      osc.frequency.exponentialRampToValueAtTime(slideTo, now + duration);
-    }
-
-    gain.gain.setValueAtTime(gainVal, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-    osc.start(now);
-    osc.stop(now + duration);
-  }
-
-  playClick() {
-    this.playTone(580, 'triangle', 0.07, 0.1, 780);
-  }
-
-  playPour() {
-    if (!this.sfxEnabled) return;
-    this.init();
-    if (!this.ctx) return;
-    const now = this.ctx.currentTime;
-    const bufferSize = this.ctx.sampleRate * 0.35;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.4;
-    }
-    const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
-
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(420, now);
-    filter.frequency.linearRampToValueAtTime(980, now + 0.35);
-    filter.Q.value = 3;
-
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.16, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.ctx.destination);
-    noise.start(now);
-  }
-
-  playPearlDrop() {
-    // Cute bubble pop "bloop!"
-    this.playTone(280, 'sine', 0.11, 0.16, 660);
-    setTimeout(() => this.playTone(340, 'sine', 0.09, 0.12, 740), 65);
-  }
-
-  playIceClink() {
-    this.playTone(1850, 'sine', 0.09, 0.09, 2250);
-    setTimeout(() => this.playTone(2150, 'triangle', 0.08, 0.08, 2500), 60);
-  }
-
-  playShake() {
-    if (!this.sfxEnabled) return;
-    this.init();
-    if (!this.ctx) return;
-    const now = this.ctx.currentTime;
-    const bufferSize = this.ctx.sampleRate * 0.09;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
-    }
-    const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
-
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'highpass';
-    filter.frequency.value = 1400;
-
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.15, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.09);
-
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.ctx.destination);
-    noise.start(now);
-  }
-
-  playSealMachine() {
-    // Hydraulic press + ding!
-    this.playTone(160, 'sawtooth', 0.25, 0.12, 95);
-    setTimeout(() => this.playTone(980, 'sine', 0.22, 0.15, 1320), 240);
-  }
-
-  playCoin() {
-    this.playTone(987.77, 'sine', 0.11, 0.14); // B5
-    setTimeout(() => this.playTone(1318.51, 'sine', 0.24, 0.15), 85); // E6
-  }
-
-  playSuccessFanfare() {
-    const notes = [523.25, 659.25, 783.99, 1046.5];
-    notes.forEach((n, idx) => {
-      setTimeout(() => this.playTone(n, 'triangle', 0.22, 0.15), idx * 90);
+  preload() {
+    if (this.preloaded || typeof window === 'undefined') return;
+    this.preloaded = true;
+    Object.entries(AUDIO_FILES).forEach(([key, url]) => {
+      if (key === 'cafe_bgm') return;
+      try {
+        const audio = new Audio(url);
+        audio.preload = 'auto';
+        this.cache[key] = audio;
+      } catch {
+        // Ignore in headless/non-audio environments
+      }
     });
   }
 
-  playAngrySplat() {
-    // Angry buzzer + messy splash!
-    this.playTone(190, 'sawtooth', 0.28, 0.2, 110);
+  playSample(key, { volume = 0.5, maxDurationMs = 1400, playbackRate = 1.0 } = {}) {
+    if (!this.sfxEnabled || typeof window === 'undefined') return false;
+    const url = AUDIO_FILES[key];
+    if (!url) return false;
+    try {
+      const base = this.cache[key];
+      const audio = base ? base.cloneNode(true) : new Audio(url);
+      audio.volume = Math.max(0, Math.min(1, volume));
+      audio.playbackRate = playbackRate;
+      const playPromise = audio.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {});
+      }
+      if (maxDurationMs > 0) {
+        setTimeout(() => {
+          try {
+            if (!audio.paused) {
+              audio.pause();
+              audio.currentTime = 0;
+            }
+          } catch {
+            // Ignore cleanup errors
+          }
+        }, maxDurationMs);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  playTone(freq, type = 'sine', duration = 0.14, gainVal = 0.1, slideTo = null) {
+    if (!this.sfxEnabled) return;
+    this.init();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, now);
+      if (slideTo) {
+        osc.frequency.exponentialRampToValueAtTime(slideTo, now + duration);
+      }
+
+      gain.gain.setValueAtTime(gainVal, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + duration);
+    } catch {
+      // Ignore WebAudio fallback errors
+    }
+  }
+
+  playClick() {
+    this.playTone(620, 'sine', 0.055, 0.06, 860);
+  }
+
+  playPour() {
+    this.playSample('pour_tea', { volume: 0.55, maxDurationMs: 1100, playbackRate: 1.05 });
+  }
+
+  playPourMilk() {
+    this.playSample('pour_milk', { volume: 0.55, maxDurationMs: 1000, playbackRate: 1.0 });
+  }
+
+  playPearlDrop() {
+    this.playSample('boba_plop', { volume: 0.62, maxDurationMs: 750, playbackRate: 1.05 + Math.random() * 0.12 });
+  }
+
+  playIceClink() {
+    this.playSample('ice_drop', { volume: 0.52, maxDurationMs: 850, playbackRate: 1.0 });
+  }
+
+  playShake() {
+    this.playSample('glass_clink', { volume: 0.48, maxDurationMs: 420, playbackRate: 1.15 + Math.random() * 0.15 });
+  }
+
+  playSealMachine() {
+    this.playTone(170, 'triangle', 0.2, 0.09, 110);
     setTimeout(() => {
-      this.playPour();
-      this.playTone(130, 'square', 0.35, 0.18, 65);
-    }, 150);
+      this.playSample('happy_bell', { volume: 0.5, maxDurationMs: 1100, playbackRate: 1.08 });
+    }, 180);
+  }
+
+  playSlurp() {
+    this.playSample('slurp', { volume: 0.55, maxDurationMs: 950, playbackRate: 1.0 });
+  }
+
+  playDoorBell() {
+    this.playSample('door_bell', { volume: 0.34, maxDurationMs: 1300, playbackRate: 1.0 });
+  }
+
+  playKittyMeow() {
+    this.playSample('kitty_meow', { volume: 0.62, maxDurationMs: 1200, playbackRate: 1.0 });
+  }
+
+  playShutter() {
+    this.playTone(1200, 'triangle', 0.04, 0.08, 450);
+    setTimeout(() => this.playTone(1600, 'sine', 0.05, 0.06, 900), 65);
+  }
+
+  playCoin() {
+    this.playSample('cash_coins', { volume: 0.52, maxDurationMs: 1100, playbackRate: 1.0 });
+  }
+
+  playSuccessFanfare() {
+    this.playSample('coin_win', { volume: 0.58, maxDurationMs: 1700, playbackRate: 1.0 });
+  }
+
+  playAngrySplat() {
+    this.playTone(195, 'sawtooth', 0.25, 0.16, 110);
+    setTimeout(() => {
+      this.playSample('boba_plop', { volume: 0.65, maxDurationMs: 650, playbackRate: 0.65 });
+      this.playTone(130, 'square', 0.3, 0.14, 65);
+    }, 140);
   }
 
   playAlienUFO() {
     const freqs = [440, 620, 510, 790, 560, 920];
     freqs.forEach((f, idx) => {
-      setTimeout(() => this.playTone(f, 'sine', 0.16, 0.12, f * 1.25), idx * 95);
+      setTimeout(() => this.playTone(f, 'sine', 0.16, 0.11, f * 1.25), idx * 95);
     });
   }
 
   playLaser() {
-    this.playTone(920, 'sawtooth', 0.13, 0.1, 210);
+    this.playTone(920, 'sawtooth', 0.12, 0.09, 210);
   }
 
   toggleSfx() {
@@ -160,31 +191,26 @@ class SoundEngine {
 
   toggleBgm() {
     this.bgmEnabled = !this.bgmEnabled;
+    if (typeof window === 'undefined') return this.bgmEnabled;
+
     if (this.bgmEnabled) {
-      this.init();
-      const chords = [
-        [261.63, 329.63, 392.0, 493.88],  // Cmaj7
-        [220.0, 261.63, 329.63, 392.0],   // Am7
-        [174.61, 220.0, 261.63, 349.23],  // Fmaj7
-        [196.0, 246.94, 293.66, 392.0],   // G6
-      ];
-      let step = 0;
-      const playChord = () => {
-        if (!this.bgmEnabled || !this.ctx) return;
-        const chord = chords[step % chords.length];
-        chord.forEach((freq, i) => {
-          setTimeout(() => {
-            if (!this.bgmEnabled) return;
-            this.playTone(freq * 1.5, 'sine', 0.85, 0.032);
-          }, i * 140);
-        });
-        step++;
-      };
-      playChord();
-      this.bgmInterval = setInterval(playChord, 1800);
-    } else if (this.bgmInterval) {
-      clearInterval(this.bgmInterval);
-      this.bgmInterval = null;
+      try {
+        if (!this.bgmAudio) {
+          this.bgmAudio = new Audio(AUDIO_FILES.cafe_bgm);
+          this.bgmAudio.loop = true;
+          this.bgmAudio.volume = 0.24;
+        }
+        const p = this.bgmAudio.play();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch {
+        // Ignore in headless environment
+      }
+    } else if (this.bgmAudio) {
+      try {
+        this.bgmAudio.pause();
+      } catch {
+        // Ignore
+      }
     }
     return this.bgmEnabled;
   }

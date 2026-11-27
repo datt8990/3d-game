@@ -1,23 +1,24 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, VolumeX, Music, Sparkles, Camera, Zap, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { Volume2, VolumeX, Music, Sparkles, Camera, Zap, RotateCcw, SlidersHorizontal, ImagePlus } from 'lucide-react';
 import { useGameStore } from '../../store/useGameStore';
-import { getTierForLevel, TEA_BASES, TOPPINGS } from '../../data/gameData';
+import { getTierForLevel, TEA_BASES, TOPPINGS, DAILY_QUESTS } from '../../data/gameData';
 import { sound } from '../../audio/soundEngine';
 
 const FALLBACK_INV = {
-  black_tea: 8,
-  green_tea: 7,
-  oolong_tea: 7,
-  taro_tea: 5,
-  milk: 12,
-  sugar: 14,
+  black_tea: 10,
+  strawberry_tea: 10,
+  green_tea: 8,
+  oolong_tea: 8,
+  taro_tea: 6,
+  milk: 14,
+  sugar: 15,
   ice: 15,
-  pearl: 8,
-  pudding: 7,
-  jelly: 7,
-  golden_boba: 5,
-  cheese_foam: 5,
+  pearl: 10,
+  pudding: 8,
+  jelly: 8,
+  golden_boba: 6,
+  cheese_foam: 6,
 };
 
 export default function TopHUD() {
@@ -43,6 +44,8 @@ export default function TopHUD() {
   const unlockDemoMaxMode = useGameStore((s) => s.unlockDemoMaxMode);
   const resetNewGame = useGameStore((s) => s.resetNewGame);
   const startAlienQuest = useGameStore((s) => s.startAlienQuest);
+  const dailyQuests = useGameStore((s) => s.dailyQuests || {});
+  const luckyWheelFreeSpins = useGameStore((s) => s.luckyWheelFreeSpins ?? 0);
 
   const [sfxOn, setSfxOn] = useState(true);
   const [bgmOn, setBgmOn] = useState(false);
@@ -58,6 +61,13 @@ export default function TopHUD() {
     TEA_BASES.some((t) => t.unlockLevel <= level && (inventory[t.id] ?? 0) <= 2) ||
     TOPPINGS.some((t) => t.unlockLevel <= level && (inventory[t.id] ?? 0) <= 2);
 
+  const hasCozyReward =
+    luckyWheelFreeSpins > 0 ||
+    DAILY_QUESTS.some((q) => {
+      const st = dailyQuests[q.id];
+      return st && !st.claimed && st.progress >= q.target;
+    });
+
   const raceStandings = tycoonRace.active
     ? [
         { name: `${playerName} (Bạn)`, earned: tycoonRace.playerEarned, isMe: true },
@@ -69,7 +79,7 @@ export default function TopHUD() {
     <header className="fixed top-0 left-0 right-0 z-20 p-2 sm:p-3 pointer-events-none">
       <div className="flex items-start justify-between gap-1.5 sm:gap-2">
         {/* Left: Cute Shop Badge, Level & Stars */}
-        <div className="boba-glass rounded-2xl sm:rounded-3xl px-2.5 py-1.5 sm:px-3.5 sm:py-2 pointer-events-auto flex items-center gap-2 sm:gap-3 max-w-[52vw] sm:max-w-none">
+        <div className="boba-glass rounded-2xl sm:rounded-3xl px-2.5 py-1.5 sm:px-3.5 sm:py-2 pointer-events-auto flex items-center gap-2 sm:gap-3 max-w-[48vw] sm:max-w-none">
           <div className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 rounded-2xl bg-gradient-to-br from-pink-400 to-rose-400 flex items-center justify-center text-lg sm:text-2xl shadow-sm border-2 border-white">
             {tier.badge}
           </div>
@@ -96,10 +106,9 @@ export default function TopHUD() {
           </div>
         </div>
 
-        {/* Center/Right Economy + Quick Actions */}
+        {/* Center/Right Economy + Quick Cute Actions */}
         <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto">
-          {/* Coins & Kho Hàng Pill */}
-          <div className="boba-glass rounded-2xl sm:rounded-3xl px-2.5 py-1.5 sm:px-4 sm:py-2 flex items-center gap-2 sm:gap-3">
+          <div className="boba-glass rounded-2xl sm:rounded-3xl px-2.5 py-1.5 sm:px-3.5 sm:py-2 flex items-center gap-1.5 sm:gap-2.5">
             <div className="flex items-center gap-1">
               <span className="text-base sm:text-xl">🪙</span>
               <div>
@@ -114,22 +123,29 @@ export default function TopHUD() {
 
             <button
               onClick={() => setActiveModal('inventory')}
-              className={`relative text-[11px] sm:text-xs font-extrabold px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border transition cursor-pointer ${
+              className={`relative text-[11px] sm:text-xs font-extrabold px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl border transition cursor-pointer ${
                 hasLowStock
                   ? 'bg-rose-500 text-white border-rose-300 animate-pulse'
                   : 'bg-pink-100 hover:bg-pink-200 text-pink-700 border-pink-300'
               }`}
             >
-              📦 <span className="hidden sm:inline">Kho Hàng</span>
-              {hasLowStock && (
-                <span className="sm:hidden ml-0.5">!</span>
-              )}
+              📦 <span className="hidden sm:inline">Kho</span>
+              {hasLowStock && <span className="sm:hidden ml-0.5">!</span>}
+            </button>
+
+            <button
+              onClick={() => setActiveModal('photo')}
+              title="Chụp Ảnh Check-in BobaGram (+120 Xu)"
+              className="bg-rose-100 hover:bg-rose-200 border border-rose-300 text-rose-700 text-[11px] sm:text-xs font-extrabold px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl flex items-center gap-1 cursor-pointer"
+            >
+              <ImagePlus className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Check-in</span>
             </button>
 
             <button
               onClick={startAlienQuest}
               title="Sự kiện Khách UFO Ngoài Hành Tinh"
-              className="hidden md:flex bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 text-emerald-800 text-xs font-extrabold px-2.5 py-1.5 rounded-xl items-center gap-1 cursor-pointer"
+              className="hidden xl:flex bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 text-emerald-800 text-xs font-extrabold px-2.5 py-1.5 rounded-xl items-center gap-1 cursor-pointer"
             >
               👽 UFO
             </button>
@@ -143,7 +159,7 @@ export default function TopHUD() {
             </button>
           </div>
 
-          {/* Desktop Camera & Sound Controls */}
+          {/* Desktop Camera & Real Audio Controls */}
           <div className="hidden lg:flex boba-glass rounded-3xl px-2.5 py-1.5 items-center gap-1">
             {sceneMode === 'shop' ? (
               <>
@@ -178,12 +194,14 @@ export default function TopHUD() {
 
             <button
               onClick={() => setSfxOn(sound.toggleSfx())}
+              title="Bật/Tắt Âm Thanh Thực Tế"
               className={`p-1.5 rounded-xl cursor-pointer ${sfxOn ? 'bg-pink-100 text-pink-600' : 'text-slate-400'}`}
             >
               {sfxOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </button>
             <button
               onClick={() => setBgmOn(sound.toggleBgm())}
+              title="Bật/Tắt Nhạc Chill Cafe"
               className={`p-1.5 rounded-xl cursor-pointer ${bgmOn ? 'bg-amber-200 text-amber-800' : 'text-slate-400 hover:bg-pink-100'}`}
             >
               <Music className="w-4 h-4" />
@@ -197,14 +215,17 @@ export default function TopHUD() {
             </button>
           </div>
 
-          {/* Mobile/Tablet Compact Utility Menu Button */}
+          {/* Mobile/Tablet Utility Menu */}
           <div className="relative lg:hidden">
             <button
               onClick={() => setMobileMenuOpen((v) => !v)}
-              className="boba-glass p-2.5 rounded-2xl text-pink-600 cursor-pointer"
+              className="relative boba-glass p-2.5 rounded-2xl text-pink-600 cursor-pointer"
               aria-label="Tiện ích"
             >
               <SlidersHorizontal className="w-4 h-4" />
+              {hasCozyReward && (
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-rose-500 border border-white" />
+              )}
             </button>
 
             {mobileMenuOpen && (
@@ -258,13 +279,13 @@ export default function TopHUD() {
                     onClick={() => setSfxOn(sound.toggleSfx())}
                     className="text-xs font-bold text-pink-700 px-2 py-1 rounded-lg bg-pink-100 cursor-pointer"
                   >
-                    {sfxOn ? '🔊 Âm thanh' : '🔇 Tắt tiếng'}
+                    {sfxOn ? '🔊 Tiếng thật' : '🔇 Tắt'}
                   </button>
                   <button
                     onClick={() => setBgmOn(sound.toggleBgm())}
                     className="text-xs font-bold text-amber-800 px-2 py-1 rounded-lg bg-amber-100 cursor-pointer"
                   >
-                    {bgmOn ? '🎵 Tắt nhạc' : '🎵 Nhạc Lo-Fi'}
+                    {bgmOn ? '🎵 Tắt nhạc' : '🎵 Cafe Chill'}
                   </button>
                   <button
                     onClick={resetNewGame}

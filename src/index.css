@@ -86,11 +86,20 @@
   border-color: rgba(244, 114, 182, 0.35);
 }
 /* Keep colored gradient CTA buttons crisp white text */
+.boba-glass button.from-pink-400,
 .boba-glass button.from-pink-500,
+.boba-glass button.from-rose-400,
 .boba-glass button.from-rose-500,
+.boba-glass button.from-emerald-400,
+.boba-glass button.from-emerald-500,
 .boba-glass button.from-sky-400,
+.boba-glass button.bg-pink-400,
 .boba-glass button.bg-pink-500,
-.boba-glass button.bg-rose-500 {
+.boba-glass button.bg-rose-500,
+.boba-glass button.bg-sky-400,
+.boba-glass button.bg-emerald-400,
+.boba-glass span.bg-rose-500,
+.boba-glass span.from-pink-400 {
   color: #ffffff !important;
 }
 

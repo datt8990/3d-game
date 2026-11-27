@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { RotateCcw, CheckCircle2, Eye, PackagePlus } from 'lucide-react';
+import { RotateCcw, Sparkles, Eye, PackagePlus, Check } from 'lucide-react';
 import { useGameStore } from '../../store/useGameStore';
 import {
   TEA_BASES,
@@ -11,18 +11,19 @@ import {
 } from '../../data/gameData';
 
 const FALLBACK_INV = {
-  black_tea: 8,
-  green_tea: 7,
-  oolong_tea: 7,
-  taro_tea: 5,
-  milk: 12,
-  sugar: 14,
+  black_tea: 10,
+  strawberry_tea: 10,
+  green_tea: 8,
+  oolong_tea: 8,
+  taro_tea: 6,
+  milk: 14,
+  sugar: 15,
   ice: 15,
-  pearl: 8,
-  pudding: 7,
-  jelly: 7,
-  golden_boba: 5,
-  cheese_foam: 5,
+  pearl: 10,
+  pudding: 8,
+  jelly: 8,
+  golden_boba: 6,
+  cheese_foam: 6,
 };
 
 export default function CraftingOverlay() {
@@ -34,7 +35,6 @@ export default function CraftingOverlay() {
   const inventory = rawInventory && rawInventory.black_tea !== undefined ? rawInventory : FALLBACK_INV;
   const customers = useGameStore((s) => s.customers);
   const selectedCustomerUid = useGameStore((s) => s.selectedCustomerUid);
-  const selectCustomerAndCraft = useGameStore((s) => s.selectCustomerAndCraft);
   const currentCup = useGameStore((s) => s.currentCup);
   const lastServeResult = useGameStore((s) => s.lastServeResult);
 
@@ -44,10 +44,7 @@ export default function CraftingOverlay() {
   const setCupIce = useGameStore((s) => s.setCupIce);
   const toggleCupTopping = useGameStore((s) => s.toggleCupTopping);
   const toggleAlienIngredient = useGameStore((s) => s.toggleAlienIngredient);
-  const advanceToShakeStep = useGameStore((s) => s.advanceToShakeStep);
-  const shakeShaker = useGameStore((s) => s.shakeShaker);
-  const pourAndSealCup = useGameStore((s) => s.pourAndSealCup);
-  const serveFinishedCup = useGameStore((s) => s.serveFinishedCup);
+  const autoShakeSealAndServe = useGameStore((s) => s.autoShakeSealAndServe);
   const resetCup = useGameStore((s) => s.resetCup);
   const restockAllIngredients = useGameStore((s) => s.restockAllIngredients);
 
@@ -55,33 +52,28 @@ export default function CraftingOverlay() {
   const pvpBattle = useGameStore((s) => s.onlineState.pvpBattle);
   const tournament = useGameStore((s) => s.tournament);
 
-  // Mobile step tab ('tea' | 'sugar' | 'topping' | 'finish')
+  // Effortless 3-tab mobile layout: 'tea' | 'topping' | 'serve'
   const [mobileTab, setMobileTab] = useState('tea');
 
-  // Auto-guide mobile tab as player progresses!
   useEffect(() => {
-    if (currentCup.tea === null && currentCup.milk === null) {
+    if (!currentCup.tea) {
       setMobileTab('tea');
-    } else if (currentCup.tea !== null && currentCup.milk !== null && currentCup.sugar === null) {
-      setMobileTab('sugar');
-    } else if (currentCup.sugar !== null && currentCup.ice !== null && currentCup.toppings.length === 0 && currentCup.step <= 4) {
-      setMobileTab('topping');
-    } else if (currentCup.step >= 5) {
-      setMobileTab('finish');
+    } else if (currentCup.isServingAnim) {
+      setMobileTab('serve');
     }
-  }, [currentCup.tea, currentCup.milk, currentCup.sugar, currentCup.ice, currentCup.step]);
+  }, [currentCup.tea, currentCup.isServingAnim]);
 
   useEffect(() => {
     if (sceneMode !== 'crafting') return;
     const onKey = (e) => {
-      if (e.code === 'Space' && currentCup.step === 5 && currentCup.shakeProgress < 100) {
+      if (e.code === 'Space' && currentCup.tea && !currentCup.isServingAnim) {
         e.preventDefault();
-        shakeShaker(20);
+        autoShakeSealAndServe();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [sceneMode, currentCup.step, currentCup.shakeProgress, shakeShaker]);
+  }, [sceneMode, currentCup.tea, currentCup.isServingAnim, autoShakeSealAndServe]);
 
   if (sceneMode !== 'crafting') return null;
 
@@ -97,44 +89,39 @@ export default function CraftingOverlay() {
 
   const teaObj = activeOrder ? TEA_BASES.find((t) => t.id === activeOrder.tea) : null;
 
-  // Compute exact available stock including unshaken refund so 0-stock items are STRICTLY disabled!
-  const prevMilkRefund =
-    currentCup.shakeProgress === 0
-      ? MILK_OPTIONS.find((m) => m.id === currentCup.milk)?.stockCost || 0
-      : 0;
-  const availMilk = (inventory.milk ?? 0) + prevMilkRefund;
-
-  const prevSugarRefund =
-    currentCup.shakeProgress === 0
-      ? SUGAR_OPTIONS.find((x) => x.id === currentCup.sugar)?.stockCost || 0
-      : 0;
-  const availSugar = (inventory.sugar ?? 0) + prevSugarRefund;
-
-  const prevIceRefund =
-    currentCup.shakeProgress === 0
-      ? ICE_OPTIONS.find((x) => x.id === currentCup.ice)?.stockCost || 0
-      : 0;
-  const availIce = (inventory.ice ?? 0) + prevIceRefund;
+  const availMilk = inventory.milk ?? 0;
+  const availSugar = inventory.sugar ?? 0;
+  const availIce = inventory.ice ?? 0;
 
   const hasLowStock =
-    (inventory.milk ?? 0) <= 2 ||
-    (inventory.sugar ?? 0) <= 2 ||
-    (inventory.ice ?? 0) <= 2 ||
+    availMilk <= 2 ||
+    availSugar <= 2 ||
+    availIce <= 2 ||
     TEA_BASES.some((t) => t.unlockLevel <= level && (inventory[t.id] ?? 0) <= 2) ||
     TOPPINGS.some((t) => t.unlockLevel <= level && (inventory[t.id] ?? 0) <= 2);
 
+  const canServeNow = (Boolean(currentCup.tea) || isAlienMode) && !currentCup.isServingAnim;
+
+  const serveStatusText = !currentCup.isServingAnim
+    ? '✨ LẮC, DẬP NẮP & GIAO KHÁCH!'
+    : currentCup.isSealed
+    ? '💖 Đang trao ly cho khách...'
+    : currentCup.isPoured
+    ? '⚙️ Đang dập nắp xinh xắn...'
+    : '🧋 Đang lắc trà sữa thật đều...';
+
   return (
     <div className="fixed inset-0 z-10 pointer-events-none flex flex-col justify-between pt-16 sm:pt-20 pb-18 sm:pb-20 px-2 sm:px-5">
-      {/* TOP ORDER TICKET & QUICK RESTOCK */}
+      {/* TOP ORDER TICKET WITH LIVE CHECKMARKS */}
       <div className="flex flex-wrap justify-between items-start gap-1.5 sm:gap-2">
-        <div className="pointer-events-auto max-w-full sm:max-w-md">
+        <div className="pointer-events-auto max-w-full sm:max-w-lg">
           {isAlienMode ? (
             <div className="boba-card-cream rounded-2xl p-2.5 sm:p-3 border-2 border-emerald-400 shadow-lg">
               <div className="flex items-center justify-between gap-2 mb-1">
                 <span className="font-display font-extrabold text-emerald-700 text-xs sm:text-sm">
                   👽 ĐƠN HÀNG THIÊN HÀ!
                 </span>
-                <span className="bg-rose-500 text-white text-[10px] sm:text-xs font-extrabold px-2 py-0.5 rounded-full animate-pulse">
+                <span className="bg-rose-500 text-white text-[10px] sm:text-xs font-extrabold px-2 py-0.5 rounded-full">
                   🫧 Oxy: {alienQuest.timeLeft}s
                 </span>
               </div>
@@ -182,27 +169,59 @@ export default function CraftingOverlay() {
                 </div>
               )}
 
+              {/* Live Match Chips: turns emerald when your cup matches the customer's wish! */}
               <div className="flex flex-wrap items-center gap-1 text-[10px] sm:text-xs font-extrabold">
-                <span className="bg-purple-100 text-purple-900 border border-purple-200 px-1.5 sm:px-2 py-0.5 rounded-lg">
+                <span
+                  className={`px-1.5 sm:px-2 py-0.5 rounded-lg border flex items-center gap-0.5 ${
+                    currentCup.tea === activeOrder.tea
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : 'bg-pink-50 text-pink-900 border-pink-200'
+                  }`}
+                >
+                  {currentCup.tea === activeOrder.tea && <Check className="w-3 h-3" />}
                   {teaObj?.icon} {teaObj?.shortName}
                 </span>
-                <span className="bg-pink-100 text-pink-900 border border-pink-200 px-1.5 sm:px-2 py-0.5 rounded-lg">
+                <span
+                  className={`px-1.5 sm:px-2 py-0.5 rounded-lg border ${
+                    currentCup.milk === activeOrder.milk
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : 'bg-white text-pink-900 border-pink-200'
+                  }`}
+                >
                   🥛 {activeOrder.milk}%
                 </span>
-                <span className="bg-amber-100 text-amber-900 border border-amber-200 px-1.5 sm:px-2 py-0.5 rounded-lg">
+                <span
+                  className={`px-1.5 sm:px-2 py-0.5 rounded-lg border ${
+                    currentCup.sugar === activeOrder.sugar
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : 'bg-amber-50 text-amber-900 border-amber-200'
+                  }`}
+                >
                   🍬 {activeOrder.sugar}%
                 </span>
-                <span className="bg-sky-100 text-sky-900 border border-sky-200 px-1.5 sm:px-2 py-0.5 rounded-lg">
+                <span
+                  className={`px-1.5 sm:px-2 py-0.5 rounded-lg border ${
+                    currentCup.ice === activeOrder.ice
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : 'bg-sky-50 text-sky-900 border-sky-200'
+                  }`}
+                >
                   🧊 {activeOrder.ice}%
                 </span>
                 {activeOrder.toppings.map((tid) => {
                   const top = TOPPINGS.find((x) => x.id === tid);
+                  const matched = currentCup.toppings.includes(tid);
                   return (
                     <span
                       key={tid}
-                      className="bg-emerald-100 text-emerald-900 border border-emerald-200 px-1.5 sm:px-2 py-0.5 rounded-lg"
+                      className={`px-1.5 sm:px-2 py-0.5 rounded-lg border flex items-center gap-0.5 ${
+                        matched
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-purple-50 text-purple-900 border-purple-200'
+                      }`}
                     >
-                      {top?.icon} {top?.name}
+                      {matched && <Check className="w-3 h-3" />}
+                      {top?.icon} {top?.shortName}
                     </span>
                   );
                 })}
@@ -210,7 +229,7 @@ export default function CraftingOverlay() {
             </div>
           ) : (
             <div className="boba-card-cream rounded-2xl px-3 py-2 text-xs font-bold text-pink-700">
-              🌸 Đang chờ khách đáng yêu tiếp theo ghé quán~
+              🌸 Đang chờ vị khách đáng yêu tiếp theo ghé quán~
             </div>
           )}
         </div>
@@ -238,7 +257,7 @@ export default function CraftingOverlay() {
         </div>
       </div>
 
-      {/* Serve Toast */}
+      {/* Serve Result Toast */}
       {lastServeResult && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -253,25 +272,24 @@ export default function CraftingOverlay() {
         </motion.div>
       )}
 
-      {/* KAWAII PASTEL WORKSTATION DOCK */}
+      {/* EFFORTLESS 3-STEP KAWAII BARISTA DOCK */}
       <div className="w-full max-w-5xl mx-auto boba-glass rounded-3xl p-2 sm:p-2.5 pointer-events-auto">
-        {/* Mobile Step Switcher Pills (< 768px) */}
-        <div className="grid grid-cols-4 gap-1 mb-2 md:hidden">
+        {/* Mobile 3-Step Switcher (< 768px) */}
+        <div className="grid grid-cols-3 gap-1.5 mb-2 md:hidden">
           {[
-            { id: 'tea', label: '1. Trà & Sữa', done: currentCup.tea !== null && currentCup.milk !== null },
-            { id: 'sugar', label: '2. Đường/Đá', done: currentCup.sugar !== null && currentCup.ice !== null },
-            { id: 'topping', label: '3. Topping', done: currentCup.toppings.length > 0 },
-            { id: 'finish', label: '4. Lắc & Giao', done: currentCup.isSealed },
+            { id: 'tea', label: '1. Vị Trà', done: Boolean(currentCup.tea) },
+            { id: 'topping', label: '2. Topping', done: currentCup.toppings.length > 0 },
+            { id: 'serve', label: '3. Giao Ly ✨', done: currentCup.isSealed },
           ].map((tb) => (
             <button
               key={tb.id}
               onClick={() => setMobileTab(tb.id)}
-              className={`py-1.5 px-1 rounded-xl text-[10px] font-extrabold transition cursor-pointer ${
+              className={`py-1.5 px-2 rounded-xl text-[11px] font-extrabold transition cursor-pointer ${
                 mobileTab === tb.id
                   ? 'bg-gradient-to-r from-pink-400 to-rose-500 text-white shadow-xs'
                   : tb.done
                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                  : 'bg-white/80 text-[#591d3b] border border-pink-200'
+                  : 'bg-white/85 text-[#591d3b] border border-pink-200'
               }`}
             >
               {tb.done && mobileTab !== tb.id ? '✓ ' : ''}
@@ -281,32 +299,33 @@ export default function CraftingOverlay() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-stretch">
-          {/* SECTION 1: TRÀ & SỮA */}
+          {/* STEP 1: CHỌN VỊ TRÀ SỮA + CHỈNH NHANH SỮA/ĐƯỜNG/ĐÁ */}
           <div
             className={`${
               mobileTab === 'tea' ? 'block' : 'hidden md:block'
-            } md:col-span-3 space-y-1.5 bg-white/80 rounded-2xl p-2.5 border-2 border-pink-200/80`}
+            } md:col-span-5 space-y-1.5 bg-white/85 rounded-2xl p-2.5 border-2 border-pink-200/80`}
           >
             <div className="flex justify-between items-center text-[11px] font-extrabold text-pink-700">
-              <span>🍓 1. Trà & 2. Sữa</span>
-              <span className={(inventory.milk ?? 0) <= 2 ? 'text-rose-600 animate-pulse' : 'text-sky-700'}>
-                🥛 Sữa: {inventory.milk ?? 0}
+              <span>🍓 Bước 1: Chọn Vị Trà Sữa</span>
+              <span className="text-[10px] text-[#6d3b53]">
+                🥛{availMilk} • 🍬{availSugar} • 🧊{availIce}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-1.5">
+            {/* 5 Signature Tea Flavor Buttons */}
+            <div className="flex flex-wrap gap-1.5">
               {TEA_BASES.map((t) => {
                 const locked = t.unlockLevel > level;
                 const stock = inventory[t.id] ?? 0;
                 const active = currentCup.tea === t.id;
-                const isDisabled = locked || (stock <= 0 && !active);
+                const isDisabled = locked || (stock <= 0 && !active) || currentCup.isServingAnim;
 
                 return (
                   <button
                     key={t.id}
                     disabled={isDisabled}
                     onClick={() => setCupTea(t.id)}
-                    className={`px-2 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center justify-between gap-1 border transition ${
+                    className={`px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 border transition ${
                       locked
                         ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                         : active
@@ -316,12 +335,12 @@ export default function CraftingOverlay() {
                         : 'bg-pink-50/70 hover:bg-pink-100 text-[#4a1d35] border-pink-200 cursor-pointer'
                     }`}
                   >
-                    <span className="truncate">
+                    <span>
                       {t.icon} {t.shortName}
                     </span>
                     {!locked && (
                       <span
-                        className={`px-1.5 py-0.2 rounded-full text-[9px] font-extrabold ${
+                        className={`px-1.5 rounded-full text-[9px] font-extrabold ${
                           stock === 0
                             ? 'bg-rose-500 text-white'
                             : stock <= 2
@@ -339,111 +358,90 @@ export default function CraftingOverlay() {
               })}
             </div>
 
-            <div className="grid grid-cols-3 gap-1">
-              {MILK_OPTIONS.map((m) => {
-                const active = currentCup.milk === m.id;
-                const noMilk = availMilk < m.stockCost && !active;
-                return (
-                  <button
-                    key={m.id}
-                    disabled={noMilk}
-                    onClick={() => setCupMilk(m.id)}
-                    className={`py-1.5 rounded-xl text-[10px] font-extrabold border transition ${
-                      active
-                        ? 'bg-gradient-to-r from-pink-400 to-rose-400 text-white border-pink-500 cursor-pointer'
-                        : noMilk
-                        ? 'bg-rose-50 text-rose-300 border-rose-200 opacity-60 cursor-not-allowed line-through'
-                        : 'bg-white hover:bg-pink-50 text-[#591d3b] border-pink-200 cursor-pointer'
-                    }`}
-                  >
-                    {m.short}
-                  </button>
-                );
-              })}
+            {/* Compact Pre-Defaulted Milk / Sugar / Ice Tweakers */}
+            <div className="grid grid-cols-3 gap-1.5 pt-0.5">
+              <div className="flex items-center gap-0.5 bg-pink-50/70 rounded-xl p-1 border border-pink-100">
+                <span className="text-[10px] px-0.5">🥛</span>
+                {MILK_OPTIONS.map((m) => {
+                  const active = currentCup.milk === m.id;
+                  const disabled = (availMilk < m.stockCost && !active) || currentCup.isServingAnim;
+                  return (
+                    <button
+                      key={m.id}
+                      disabled={disabled}
+                      onClick={() => setCupMilk(m.id)}
+                      className={`flex-1 py-1 rounded-lg text-[9px] font-extrabold transition ${
+                        active
+                          ? 'bg-pink-400 text-white cursor-pointer'
+                          : disabled
+                          ? 'text-rose-300 opacity-50 cursor-not-allowed line-through'
+                          : 'text-[#591d3b] hover:bg-pink-100 cursor-pointer'
+                      }`}
+                    >
+                      {m.id}%
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-0.5 bg-amber-50/70 rounded-xl p-1 border border-amber-100">
+                <span className="text-[10px] px-0.5">🍬</span>
+                {SUGAR_OPTIONS.map((s) => {
+                  const active = currentCup.sugar === s.id;
+                  const disabled = (availSugar < s.stockCost && !active) || currentCup.isServingAnim;
+                  return (
+                    <button
+                      key={s.id}
+                      disabled={disabled}
+                      onClick={() => setCupSugar(s.id)}
+                      className={`flex-1 py-1 rounded-lg text-[9px] font-extrabold transition ${
+                        active
+                          ? 'bg-amber-400 text-amber-950 cursor-pointer'
+                          : disabled
+                          ? 'text-rose-300 opacity-50 cursor-not-allowed line-through'
+                          : 'text-amber-900 hover:bg-amber-100 cursor-pointer'
+                      }`}
+                    >
+                      {s.id}%
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-0.5 bg-sky-50/70 rounded-xl p-1 border border-sky-100">
+                <span className="text-[10px] px-0.5">🧊</span>
+                {ICE_OPTIONS.map((ic) => {
+                  const active = currentCup.ice === ic.id;
+                  const disabled = (availIce < ic.stockCost && !active) || currentCup.isServingAnim;
+                  return (
+                    <button
+                      key={ic.id}
+                      disabled={disabled}
+                      onClick={() => setCupIce(ic.id)}
+                      className={`flex-1 py-1 rounded-lg text-[9px] font-extrabold transition ${
+                        active
+                          ? 'bg-sky-400 text-white cursor-pointer'
+                          : disabled
+                          ? 'text-rose-300 opacity-50 cursor-not-allowed line-through'
+                          : 'text-sky-900 hover:bg-sky-100 cursor-pointer'
+                      }`}
+                    >
+                      {ic.id}%
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          {/* SECTION 2: ĐƯỜNG & ĐÁ */}
-          <div
-            className={`${
-              mobileTab === 'sugar' ? 'block' : 'hidden md:block'
-            } md:col-span-3 space-y-1.5 bg-white/80 rounded-2xl p-2.5 border-2 border-pink-200/80`}
-          >
-            <div className="flex justify-between items-center text-[11px] font-extrabold text-pink-700">
-              <span>🍬 3. Đường & Đá</span>
-              <span className="text-[10px] text-[#6d3b53]">
-                🍬{inventory.sugar ?? 0} • 🧊{inventory.ice ?? 0}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-5 gap-1">
-              {SUGAR_OPTIONS.map((s) => {
-                const active = currentCup.sugar === s.id;
-                const noSugar = availSugar < s.stockCost && !active;
-                return (
-                  <button
-                    key={s.id}
-                    disabled={noSugar}
-                    onClick={() => setCupSugar(s.id)}
-                    className={`py-1.5 rounded-xl text-[10px] font-extrabold border transition ${
-                      active
-                        ? 'bg-amber-400 text-amber-950 border-amber-500 cursor-pointer'
-                        : noSugar
-                        ? 'bg-rose-50 text-rose-300 border-rose-200 opacity-60 cursor-not-allowed line-through'
-                        : 'bg-amber-50/70 hover:bg-amber-100 text-amber-900 border-amber-200 cursor-pointer'
-                    }`}
-                  >
-                    {s.id}%
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="grid grid-cols-3 gap-1">
-              {ICE_OPTIONS.map((ic) => {
-                const active = currentCup.ice === ic.id;
-                const noIce = availIce < ic.stockCost && !active;
-                return (
-                  <button
-                    key={ic.id}
-                    disabled={noIce}
-                    onClick={() => setCupIce(ic.id)}
-                    className={`py-1.5 rounded-xl text-[10px] font-extrabold border transition ${
-                      active
-                        ? 'bg-sky-400 text-white border-sky-500 cursor-pointer'
-                        : noIce
-                        ? 'bg-rose-50 text-rose-300 border-rose-200 opacity-60 cursor-not-allowed line-through'
-                        : 'bg-sky-50/80 hover:bg-sky-100 text-sky-900 border-sky-200 cursor-pointer'
-                    }`}
-                  >
-                    🧊 {ic.id}%
-                  </button>
-                );
-              })}
-            </div>
-
-            {isAlienMode && (
-              <button
-                onClick={() => toggleAlienIngredient('loveSpice')}
-                className={`w-full py-1.5 rounded-xl text-[10px] font-extrabold cursor-pointer ${
-                  currentCup.loveSpice
-                    ? 'bg-gradient-to-r from-pink-400 to-rose-500 text-white'
-                    : 'bg-pink-100 text-pink-700 border border-pink-300'
-                }`}
-              >
-                💖 {currentCup.loveSpice ? 'Đã thêm Tình Yêu!' : '+ Gia vị Tình Yêu'}
-              </button>
-            )}
-          </div>
-
-          {/* SECTION 3: TOPPING */}
+          {/* STEP 2: THẢ TOPPING CUTE */}
           <div
             className={`${
               mobileTab === 'topping' ? 'block' : 'hidden md:block'
-            } md:col-span-3 space-y-1.5 bg-white/80 rounded-2xl p-2.5 border-2 border-pink-200/80`}
+            } md:col-span-4 space-y-1.5 bg-white/85 rounded-2xl p-2.5 border-2 border-pink-200/80`}
           >
             <div className="flex justify-between items-center text-[11px] font-extrabold text-pink-700">
-              <span>🍮 4. Topping Cute</span>
+              <span>🍮 Bước 2: Thả Topping</span>
               <button
                 onClick={() => setActiveModal('inventory')}
                 className="text-[10px] text-emerald-700 underline cursor-pointer"
@@ -457,14 +455,14 @@ export default function CraftingOverlay() {
                 const locked = top.unlockLevel > level;
                 const stock = inventory[top.id] ?? 0;
                 const selected = currentCup.toppings.includes(top.id);
-                const isDisabled = locked || (stock <= 0 && !selected);
+                const isDisabled = locked || (stock <= 0 && !selected) || currentCup.isServingAnim;
 
                 return (
                   <button
                     key={top.id}
                     disabled={isDisabled}
                     onClick={() => toggleCupTopping(top.id)}
-                    className={`px-2.5 py-1.5 rounded-xl text-[10px] font-extrabold flex items-center gap-1 border transition ${
+                    className={`px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 border transition ${
                       locked
                         ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                         : selected
@@ -475,7 +473,7 @@ export default function CraftingOverlay() {
                     }`}
                   >
                     <span>
-                      {top.icon} {top.name.replace('Trân Châu ', 'TC ')}
+                      {top.icon} {top.shortName}
                     </span>
                     {!locked && (
                       <span
@@ -498,40 +496,47 @@ export default function CraftingOverlay() {
             </div>
 
             {isAlienMode && (
-              <div className="grid grid-cols-2 gap-1">
+              <div className="grid grid-cols-3 gap-1 pt-0.5">
                 <button
-                  disabled={(inventory.pearl ?? 0) <= 0 && !currentCup.pearl200}
+                  onClick={() => toggleAlienIngredient('loveSpice')}
+                  className={`py-1 rounded-xl text-[10px] font-extrabold cursor-pointer ${
+                    currentCup.loveSpice ? 'bg-pink-500 text-white' : 'bg-pink-100 text-pink-800'
+                  }`}
+                >
+                  💖 Tình Yêu
+                </button>
+                <button
                   onClick={() => toggleAlienIngredient('pearl200')}
                   className={`py-1 rounded-xl text-[10px] font-extrabold cursor-pointer ${
-                    currentCup.pearl200 ? 'bg-emerald-400 text-white' : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    currentCup.pearl200 ? 'bg-emerald-400 text-white' : 'bg-emerald-100 text-emerald-800'
                   }`}
                 >
                   ⚫ x200 TC
                 </button>
                 <button
-                  disabled={(inventory.pudding ?? 0) <= 0 && !currentCup.pudding5}
                   onClick={() => toggleAlienIngredient('pudding5')}
                   className={`py-1 rounded-xl text-[10px] font-extrabold cursor-pointer ${
-                    currentCup.pudding5 ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-800 border border-amber-300'
+                    currentCup.pudding5 ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-800'
                   }`}
                 >
-                  🍮 x5 Pudding
+                  🍮 x5 Pud
                 </button>
               </div>
             )}
           </div>
 
-          {/* SECTION 4: LẮC BÌNH, DẬP NẮP & GIAO KHÁCH */}
+          {/* STEP 3: 1-TAP MAGIC SHAKE, SEAL & SERVE! */}
           <div
             className={`${
-              mobileTab === 'finish' ? 'block' : 'hidden md:block'
-            } md:col-span-3 space-y-2 bg-white/80 rounded-2xl p-2.5 border-2 border-pink-200/80 flex flex-col justify-between`}
+              mobileTab === 'serve' ? 'block' : 'hidden md:block'
+            } md:col-span-3 space-y-2 bg-white/85 rounded-2xl p-2.5 border-2 border-pink-200/80 flex flex-col justify-between`}
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold text-pink-700">
-                🧋 5. Lắc ({currentCup.shakeProgress}%) & 6. Giao
+                ✨ Bước 3: Hoàn Tất
               </span>
               <button
+                disabled={currentCup.isServingAnim}
                 onClick={resetCup}
                 className="text-[10px] font-bold text-rose-500 hover:text-rose-700 flex items-center gap-0.5 cursor-pointer"
               >
@@ -539,43 +544,28 @@ export default function CraftingOverlay() {
               </button>
             </div>
 
+            {/* Smooth Progress Bar during 1-tap Shake & Seal */}
             <div className="w-full h-2.5 bg-pink-100 rounded-full overflow-hidden border border-pink-200">
               <div
-                className="h-full bg-gradient-to-r from-pink-400 via-purple-400 to-amber-400 transition-all duration-100"
-                style={{ width: `${currentCup.shakeProgress}%` }}
+                className="h-full bg-gradient-to-r from-pink-400 via-rose-400 to-amber-400 transition-all duration-200"
+                style={{ width: `${currentCup.isSealed ? 100 : currentCup.shakeProgress}%` }}
               />
             </div>
 
-            {currentCup.shakeProgress < 100 ? (
-              <button
-                disabled={!currentCup.tea}
-                onClick={() => {
-                  if (currentCup.step < 5) advanceToShakeStep();
-                  shakeShaker(25);
-                }}
-                className={`w-full py-2.5 rounded-2xl text-xs font-extrabold transition ${
-                  !currentCup.tea
-                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-pink-400 to-purple-500 hover:brightness-105 text-white shadow-md cursor-pointer'
-                }`}
-              >
-                🫨 BẤM ĐỂ LẮC BÌNH!
-              </button>
-            ) : !currentCup.isSealed ? (
-              <button
-                onClick={pourAndSealCup}
-                className="w-full py-2.5 rounded-2xl text-xs font-extrabold bg-gradient-to-r from-amber-400 to-orange-400 hover:brightness-105 text-slate-950 shadow-md cursor-pointer"
-              >
-                ⚙️ ĐỔ CỐC & DẬP NẮP
-              </button>
-            ) : (
-              <button
-                onClick={serveFinishedCup}
-                className="w-full py-2.5 rounded-2xl text-xs font-display font-extrabold bg-gradient-to-r from-emerald-400 to-teal-400 hover:brightness-105 text-white shadow-lg flex items-center justify-center gap-1 cursor-pointer animate-pulse"
-              >
-                <CheckCircle2 className="w-4 h-4" /> GIAO LY TRÀ SỮA! 💖
-              </button>
-            )}
+            <button
+              disabled={!canServeNow}
+              onClick={autoShakeSealAndServe}
+              className={`w-full py-2.5 px-2 rounded-2xl text-xs font-display font-extrabold flex items-center justify-center gap-1.5 transition ${
+                canServeNow
+                  ? 'bg-gradient-to-r from-pink-400 via-rose-400 to-amber-400 hover:brightness-105 text-white shadow-md cursor-pointer'
+                  : currentCup.isServingAnim
+                  ? 'bg-gradient-to-r from-emerald-400 to-teal-400 text-white cursor-wait'
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 shrink-0" />
+              <span className="truncate">{serveStatusText}</span>
+            </button>
           </div>
         </div>
       </div>
